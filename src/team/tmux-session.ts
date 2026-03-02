@@ -490,6 +490,39 @@ export function paneLooksReady(captured: string): boolean {
   return hasCodexHint;
 }
 
+export interface WaitForPaneReadyOptions {
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}
+
+export async function waitForPaneReady(
+  paneId: string,
+  opts: WaitForPaneReadyOptions = {}
+): Promise<boolean> {
+  const envTimeout = Number.parseInt(process.env.OMC_SHELL_READY_TIMEOUT_MS ?? '', 10);
+  const timeoutMs = Number.isFinite(opts.timeoutMs) && (opts.timeoutMs ?? 0) > 0
+    ? Number(opts.timeoutMs)
+    : (Number.isFinite(envTimeout) && envTimeout > 0 ? envTimeout : 10_000);
+  const pollIntervalMs = Number.isFinite(opts.pollIntervalMs) && (opts.pollIntervalMs ?? 0) > 0
+    ? Number(opts.pollIntervalMs)
+    : 250;
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const captured = await capturePaneAsync(paneId, promisifiedExecFile as never);
+    if (paneLooksReady(captured) && !paneHasActiveTask(captured)) {
+      return true;
+    }
+    await sleep(pollIntervalMs);
+  }
+
+  console.warn(
+    `[tmux-session] waitForPaneReady: pane ${paneId} timed out after ${timeoutMs}ms ` +
+    `(set OMC_SHELL_READY_TIMEOUT_MS to tune)`
+  );
+  return false;
+}
+
 function paneTailContainsLiteralLine(captured: string, text: string): boolean {
   return normalizeTmuxCapture(captured).includes(normalizeTmuxCapture(text));
 }
