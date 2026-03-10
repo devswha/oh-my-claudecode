@@ -24,6 +24,17 @@ describe('worker-bootstrap', () => {
       expect(generateMailboxTriggerMessage('test-team', 'worker-1', 2)).toContain('ACK-only');
     });
 
+    it('supports state-root placeholders for worktree-backed trigger paths', () => {
+      expect(generateTriggerMessage('test-team', 'worker-1', '$OMC_TEAM_STATE_ROOT'))
+        .toContain('$OMC_TEAM_STATE_ROOT/team/test-team/workers/worker-1/inbox.md');
+      expect(generateTriggerMessage('test-team', 'worker-1', '$OMC_TEAM_STATE_ROOT'))
+        .toContain('work now');
+      expect(generateMailboxTriggerMessage('test-team', 'worker-1', 2, '$OMC_TEAM_STATE_ROOT'))
+        .toContain('$OMC_TEAM_STATE_ROOT/team/test-team/mailbox/worker-1.json');
+      expect(generateMailboxTriggerMessage('test-team', 'worker-1', 2, '$OMC_TEAM_STATE_ROOT'))
+        .toContain('report progress');
+    });
+
     it('includes sentinel file write instruction first', () => {
       const overlay = generateWorkerOverlay(baseParams);
       const sentinelIdx = overlay.indexOf('.ready');
