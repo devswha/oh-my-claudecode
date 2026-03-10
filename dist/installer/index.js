@@ -215,7 +215,7 @@ export function isOmcHook(command) {
     // Match "omc" as a path segment or word boundary
     // Matches: /omc/, /omc-, omc/, -omc, _omc, omc_
     const omcPattern = /(?:^|[\/\\_-])omc(?:$|[\/\\_-])/;
-    const fullNamePattern = /oh-my-claudecode/;
+    const fullNamePattern = /oh-my-(?:openagent|claudecode)/;
     if (omcPattern.test(lowerCommand) || fullNamePattern.test(lowerCommand)) {
         return true;
     }
