@@ -10,7 +10,7 @@ import {
   type TeamSession, type WorkerPaneConfig,
 } from './tmux-session.js';
 import {
-  composeInitialInbox, ensureWorkerStateDir, writeWorkerOverlay,
+  composeInitialInbox, ensureWorkerStateDir, writeWorkerOverlay, generateTriggerMessage,
 } from './worker-bootstrap.js';
 import {
   withTaskLock,
@@ -750,7 +750,7 @@ export async function spawnWorkerForTask(
   // For prompt-mode agents (e.g. Gemini Ink TUI), pass instruction via CLI
   // flag so tmux send-keys never needs to interact with the TUI input widget.
   if (usePromptMode) {
-    const promptArgs = getPromptModeArgs(agentType, `Read and execute your task from: ${relInboxPath}`);
+    const promptArgs = getPromptModeArgs(agentType, generateTriggerMessage(runtime.teamName, workerNameValue));
     launchArgs.push(...promptArgs);
   }
 
@@ -803,7 +803,7 @@ export async function spawnWorkerForTask(
     const notified = await notifyPaneWithRetry(
       runtime.sessionName,
       paneId,
-      `Read and execute your task from: ${relInboxPath}`
+      generateTriggerMessage(runtime.teamName, workerNameValue)
     );
     if (!notified) {
       await killWorkerPane(runtime, workerNameValue, paneId);

@@ -18,7 +18,7 @@
 
 import { join, resolve } from 'path';
 import { existsSync } from 'fs';
-import { mkdir, rm, readdir, writeFile } from 'fs/promises';
+import { mkdir, rm, readdir, readFile, writeFile } from 'fs/promises';
 import { performance } from 'perf_hooks';
 import { TeamPaths, absPath, teamStateRoot } from './state-paths.js';
 import {
@@ -281,6 +281,62 @@ interface SpawnV2WorkerResult {
   startupFailureReason?: string;
 }
 
+interface MailboxSnapshot {
+  messages?: Array<{ from_worker?: string }>;
+}
+
+function hasWorkerStatusProgress(status: WorkerStatus, taskId: string): boolean {
+  if (status.current_task_id === taskId) return true;
+  return ['working', 'blocked', 'done', 'failed'].includes(status.state);
+}
+
+async function hasLeaderMailboxAck(
+  teamName: string,
+  workerName: string,
+  cwd: string,
+): Promise<boolean> {
+  try {
+    const raw = await readFile(absPath(cwd, TeamPaths.mailbox(teamName, 'leader-fixed')), 'utf-8');
+    const mailbox = JSON.parse(raw) as MailboxSnapshot;
+    return Array.isArray(mailbox.messages)
+      && mailbox.messages.some((message) => message?.from_worker === workerName);
+  } catch {
+    return false;
+  }
+}
+
+async function hasClaudeStartupEvidence(
+  teamName: string,
+  workerName: string,
+  taskId: string,
+  cwd: string,
+): Promise<boolean> {
+  const [hasAck, status] = await Promise.all([
+    hasLeaderMailboxAck(teamName, workerName, cwd),
+    readWorkerStatus(teamName, workerName, cwd),
+  ]);
+  return hasAck || hasWorkerStatusProgress(status, taskId);
+}
+
+async function waitForClaudeStartupEvidence(
+  teamName: string,
+  workerName: string,
+  taskId: string,
+  cwd: string,
+  attempts = 3,
+  delayMs = 250,
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    if (await hasClaudeStartupEvidence(teamName, workerName, taskId, cwd)) {
+      return true;
+    }
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return false;
+}
+
 /**
  * Spawn a single v2 worker in a tmux pane.
  * Writes CLI API inbox (no done.json), waits for ready, sends inbox path.
@@ -353,7 +409,7 @@ async function spawnV2Worker(opts: SpawnV2WorkerOptions): Promise<SpawnV2WorkerR
   // For prompt-mode agents (codex, gemini), pass instruction via CLI flag
   if (usePromptMode) {
     const promptArgs = getPromptModeArgs(
-      opts.agentType, `Read and execute your task from: ${relInboxPath}`,
+      opts.agentType, inboxTriggerMessage,
     );
     launchArgs.push(...promptArgs);
   }
@@ -422,6 +478,38 @@ async function spawnV2Worker(opts: SpawnV2WorkerOptions): Promise<SpawnV2WorkerR
       startupAssigned: false,
       startupFailureReason: dispatchOutcome.reason,
     };
+  }
+
+  if (opts.agentType === 'claude') {
+    const settled = await waitForClaudeStartupEvidence(
+      opts.teamName,
+      opts.workerName,
+      opts.taskId,
+      opts.cwd,
+    );
+    if (!settled) {
+      const renotified = await notifyStartupInbox(opts.sessionName, paneId, inboxTriggerMessage);
+      if (!renotified.ok) {
+        return {
+          paneId,
+          startupAssigned: false,
+          startupFailureReason: `${renotified.reason}:startup_evidence_missing`,
+        };
+      }
+      const settledAfterRetry = await waitForClaudeStartupEvidence(
+        opts.teamName,
+        opts.workerName,
+        opts.taskId,
+        opts.cwd,
+      );
+      if (!settledAfterRetry) {
+        return {
+          paneId,
+          startupAssigned: false,
+          startupFailureReason: 'claude_startup_evidence_missing',
+        };
+      }
+    }
   }
 
   return {
