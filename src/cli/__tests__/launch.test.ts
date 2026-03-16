@@ -140,7 +140,8 @@ describe('runClaude — exit code propagation', () => {
 
       runClaude('/tmp', ['--print'], 'sid');
 
-      expect(resolveLaunchPolicy).toHaveBeenCalledWith(process.env, ['--print']);
+      // isPrintMode short-circuits before resolveLaunchPolicy is called
+      expect(resolveLaunchPolicy).not.toHaveBeenCalled();
       expect(vi.mocked(execFileSync).mock.calls.find(([cmd]) => cmd === 'tmux')).toBeUndefined();
       expect(vi.mocked(execFileSync).mock.calls.find(([cmd]) => cmd === 'claude')?.[1]).toEqual(['--print']);
     });
