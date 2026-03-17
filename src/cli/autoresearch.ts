@@ -1,6 +1,10 @@
 import { execFileSync, spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
-import { loadAutoresearchMissionContract } from '../autoresearch/contracts.js';
+import {
+  type AutoresearchKeepPolicy,
+  loadAutoresearchMissionContract,
+  slugifyMissionName,
+} from '../autoresearch/contracts.js';
 import {
   assertModeStartAllowed,
   buildAutoresearchRunTag,
@@ -19,15 +23,20 @@ const CLAUDE_BYPASS_FLAG = '--dangerously-skip-permissions';
 export const AUTORESEARCH_HELP = `omc autoresearch - Launch OMC autoresearch with thin-supervisor parity semantics
 
 Usage:
-  omc autoresearch                                                (guided setup + background launch)
+  omc autoresearch                                                (research interview + background launch)
+  omc autoresearch --mission TEXT --sandbox CMD [--keep-policy P] [--slug S]
   omc autoresearch init [--topic T] [--evaluator CMD] [--keep-policy P] [--slug S]
   omc autoresearch <mission-dir> [claude-args...]
   omc autoresearch --resume <run-id> [claude-args...]
 
 Arguments:
-  (no args)        Interactive guided setup: collects topic, evaluator, policy, and slug,
-                   generates a mission directory, then spawns autoresearch in a background tmux session.
-  init             Non-interactive mission scaffolding via flags (all four flags required).
+  (no args)        Interactive research interview: collects mission text, sandbox command,
+                   optional keep policy, and slug, then spawns autoresearch in a background tmux session.
+  --mission/       Explicit bypass path. --mission is raw mission text and --sandbox is the raw
+  --sandbox        evaluator/sandbox command. Both flags are required together; --keep-policy and
+                   --slug remain optional. Partial bypass is invalid.
+  init             Non-interactive mission scaffolding via flags (--topic, --evaluator, --slug;
+                   optional --keep-policy).
   <mission-dir>    Directory inside a git repository containing mission.md and sandbox.md
   <run-id>         Existing autoresearch run id from .omc/logs/autoresearch/<run-id>/manifest.json
 
@@ -89,6 +98,124 @@ export interface ParsedAutoresearchArgs {
   claudeArgs: string[];
   guided?: boolean;
   initArgs?: string[];
+  missionText?: string;
+  sandboxCommand?: string;
+  keepPolicy?: AutoresearchKeepPolicy;
+  slug?: string;
+}
+
+function parseAutoresearchKeepPolicy(value: string): AutoresearchKeepPolicy {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'pass_only' || normalized === 'score_improvement') {
+    return normalized;
+  }
+  throw new Error('--keep-policy must be one of: score_improvement, pass_only');
+}
+
+function parseAutoresearchBypassArgs(args: readonly string[]): ParsedAutoresearchArgs | null {
+  let missionText: string | undefined;
+  let sandboxCommand: string | undefined;
+  let keepPolicy: AutoresearchKeepPolicy | undefined;
+  let slug: string | undefined;
+
+  const hasBypassFlag = args.some((arg) =>
+    arg === '--mission'
+      || arg.startsWith('--mission=')
+      || arg === '--sandbox'
+      || arg.startsWith('--sandbox=')
+      || arg === '--keep-policy'
+      || arg.startsWith('--keep-policy=')
+      || arg === '--slug'
+      || arg.startsWith('--slug='),
+  );
+  if (!hasBypassFlag) {
+    return null;
+  }
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const next = args[i + 1];
+
+    if (arg === '--mission') {
+      if (!next) throw new Error('--mission requires a value.');
+      missionText = next;
+      i++;
+      continue;
+    }
+    if (arg.startsWith('--mission=')) {
+      missionText = arg.slice('--mission='.length);
+      continue;
+    }
+    if (arg === '--sandbox') {
+      if (!next) throw new Error('--sandbox requires a value.');
+      sandboxCommand = next;
+      i++;
+      continue;
+    }
+    if (arg.startsWith('--sandbox=')) {
+      sandboxCommand = arg.slice('--sandbox='.length);
+      continue;
+    }
+    if (arg === '--keep-policy') {
+      if (!next) throw new Error('--keep-policy requires a value.');
+      keepPolicy = parseAutoresearchKeepPolicy(next);
+      i++;
+      continue;
+    }
+    if (arg.startsWith('--keep-policy=')) {
+      keepPolicy = parseAutoresearchKeepPolicy(arg.slice('--keep-policy='.length));
+      continue;
+    }
+    if (arg === '--slug') {
+      if (!next) throw new Error('--slug requires a value.');
+      slug = slugifyMissionName(next);
+      i++;
+      continue;
+    }
+    if (arg.startsWith('--slug=')) {
+      slug = slugifyMissionName(arg.slice('--slug='.length));
+      continue;
+    }
+
+    if (arg.startsWith('-')) {
+      throw new Error(
+        `Unknown autoresearch flag: ${arg.split('=')[0]}.\n`
+        + 'Use --mission plus --sandbox to bypass the interview, or provide a mission-dir.\n\n'
+        + `${AUTORESEARCH_HELP}`,
+      );
+    }
+
+    throw new Error(
+      `Positional arguments are not supported with --mission/--sandbox bypass mode: ${arg}.\n\n${AUTORESEARCH_HELP}`,
+    );
+  }
+
+  const hasMission = typeof missionText === 'string' && missionText.trim().length > 0;
+  const hasSandbox = typeof sandboxCommand === 'string' && sandboxCommand.trim().length > 0;
+  if (hasMission !== hasSandbox) {
+    throw new Error(
+      'Both --mission and --sandbox are required together to bypass the interview. '
+      + 'Provide both flags, or neither to use interactive setup.\n\n'
+      + `${AUTORESEARCH_HELP}`,
+    );
+  }
+  if (!hasMission || !hasSandbox) {
+    throw new Error(
+      'Use --mission plus --sandbox together to bypass the interview. '
+      + '--keep-policy and --slug are optional only when both are present.\n\n'
+      + `${AUTORESEARCH_HELP}`,
+    );
+  }
+
+  return {
+    missionDir: null,
+    runId: null,
+    claudeArgs: [],
+    missionText: missionText!.trim(),
+    sandboxCommand: sandboxCommand!.trim(),
+    keepPolicy,
+    slug,
+  };
 }
 
 function resolveRepoRoot(cwd: string): string {
@@ -102,11 +229,12 @@ function resolveRepoRoot(cwd: string): string {
 export function parseAutoresearchArgs(args: readonly string[]): ParsedAutoresearchArgs {
   const values = [...args];
   if (values.length === 0) {
-    // TTY guard: preserve error for non-interactive callers (CI, scripts, piped stdin)
-    if (!process.stdin.isTTY) {
-      throw new Error(`mission-dir is required.\n${AUTORESEARCH_HELP}`);
-    }
     return { missionDir: null, runId: null, claudeArgs: [], guided: true };
+  }
+
+  const bypass = parseAutoresearchBypassArgs(values);
+  if (bypass) {
+    return bypass;
   }
   const first = values[0];
   if (first === 'init') {
@@ -194,22 +322,30 @@ export async function autoresearchCommand(args: string[]): Promise<void> {
     return;
   }
 
-  if (parsed.guided) {
+  if (parsed.guided || parsed.missionText) {
     const repoRoot = resolveRepoRoot(process.cwd());
     let result;
-    if (parsed.initArgs && parsed.initArgs.length > 0) {
+    if (parsed.missionText && parsed.sandboxCommand) {
+      result = await initAutoresearchMission({
+        topic: parsed.missionText,
+        evaluatorCommand: parsed.sandboxCommand,
+        keepPolicy: parsed.keepPolicy,
+        slug: parsed.slug || slugifyMissionName(parsed.missionText),
+        repoRoot,
+      });
+    } else if (parsed.initArgs && parsed.initArgs.length > 0) {
       const initOpts = parseInitArgs(parsed.initArgs);
       if (!initOpts.topic || !initOpts.evaluatorCommand || !initOpts.slug) {
         throw new Error(
-          'init requires --topic, --evaluator, and --slug flags.\n' +
-          'Optional: --keep-policy (default: score_improvement)\n\n' +
-          `${AUTORESEARCH_HELP}`,
+          'init requires --topic, --evaluator, and --slug flags.\n'
+          + 'Optional: --keep-policy\n\n'
+          + `${AUTORESEARCH_HELP}`,
         );
       }
       result = await initAutoresearchMission({
         topic: initOpts.topic,
         evaluatorCommand: initOpts.evaluatorCommand,
-        keepPolicy: initOpts.keepPolicy || 'score_improvement',
+        keepPolicy: initOpts.keepPolicy,
         slug: initOpts.slug,
         repoRoot,
       });
