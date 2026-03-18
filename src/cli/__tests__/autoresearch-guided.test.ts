@@ -25,7 +25,15 @@ vi.mock('../tmux-utils.js', () => ({
   wrapWithLoginShell: wrapWithLoginShellMock,
 }));
 
-import { guidedAutoresearchSetup, initAutoresearchMission, parseInitArgs, checkTmuxAvailable, spawnAutoresearchTmux } from '../autoresearch-guided.js';
+import {
+  checkTmuxAvailable,
+  guidedAutoresearchSetup,
+  initAutoresearchMission,
+  parseInitArgs,
+  runAutoresearchNoviceBridge,
+  spawnAutoresearchTmux,
+  type AutoresearchQuestionIO,
+} from '../autoresearch-guided.js';
 
 async function initRepo(): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), 'omc-autoresearch-guided-test-'));
@@ -36,6 +44,28 @@ async function initRepo(): Promise<string> {
   execFileSync('git', ['add', 'README.md'], { cwd, stdio: 'ignore' });
   execFileSync('git', ['commit', '-m', 'init'], { cwd, stdio: 'ignore' });
   return cwd;
+}
+
+function withMockedTty<T>(fn: () => Promise<T>): Promise<T> {
+  const descriptor = Object.getOwnPropertyDescriptor(process.stdin, 'isTTY');
+  Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: true });
+  return fn().finally(() => {
+    if (descriptor) {
+      Object.defineProperty(process.stdin, 'isTTY', descriptor);
+    } else {
+      Object.defineProperty(process.stdin, 'isTTY', { configurable: true, value: false });
+    }
+  });
+}
+
+function makeFakeIo(answers: string[]): AutoresearchQuestionIO {
+  const queue = [...answers];
+  return {
+    async question(): Promise<string> {
+      return queue.shift() ?? '';
+    },
+    close(): void {},
+  };
 }
 
 describe('initAutoresearchMission', () => {
@@ -122,7 +152,6 @@ describe('initAutoresearchMission', () => {
       await rm(repo, { recursive: true, force: true });
     }
   });
-
 
   it('allows valid mission creation even when cwd is inside missions root', async () => {
     const repo = await initRepo();
@@ -219,6 +248,94 @@ describe('parseInitArgs', () => {
   });
 });
 
+describe('runAutoresearchNoviceBridge', () => {
+  it('loops through refine further before launching and writes draft + mission files', async () => {
+    const repo = await initRepo();
+    try {
+      const result = await withMockedTty(() => runAutoresearchNoviceBridge(
+        repo,
+        {},
+        makeFakeIo([
+          'Improve evaluator UX',
+          'Make success measurable',
+          'TODO replace with evaluator command',
+          'score_improvement',
+          'ux-eval',
+          'refine further',
+          'Improve evaluator UX',
+          'Passing evaluator output',
+          'node scripts/eval.js',
+          'pass_only',
+          'ux-eval',
+          'launch',
+        ]),
+      ));
+
+      const draftContent = await readFile(join(repo, '.omc', 'specs', 'deep-interview-autoresearch-ux-eval.md'), 'utf-8');
+      const resultContent = await readFile(join(repo, '.omc', 'specs', 'autoresearch-ux-eval', 'result.json'), 'utf-8');
+      const missionContent = await readFile(join(result.missionDir, 'mission.md'), 'utf-8');
+      const sandboxContent = await readFile(join(result.missionDir, 'sandbox.md'), 'utf-8');
+
+      expect(result.slug).toBe('ux-eval');
+      expect(draftContent).toMatch(/Launch-ready: yes/);
+      expect(resultContent).toMatch(/"launchReady": true/);
+      expect(missionContent).toMatch(/Improve evaluator UX/);
+      expect(sandboxContent).toMatch(/command: node scripts\/eval\.js/);
+      expect(sandboxContent).toMatch(/keep_policy: pass_only/);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+
+  it('uses seeded inputs while still requiring confirmation-driven launch', async () => {
+    const repo = await initRepo();
+    try {
+      const result = await withMockedTty(() => runAutoresearchNoviceBridge(
+        repo,
+        {
+          topic: 'Seeded topic',
+          evaluatorCommand: 'node scripts/eval.js',
+          keepPolicy: 'score_improvement',
+          slug: 'seeded-topic',
+        },
+        makeFakeIo([
+          '',
+          '',
+          '',
+          '',
+          '',
+          'launch',
+        ]),
+      ));
+
+      const draftContent = await readFile(join(repo, '.omc', 'specs', 'deep-interview-autoresearch-seeded-topic.md'), 'utf-8');
+      expect(result.slug).toBe('seeded-topic');
+      expect(draftContent).toMatch(/- topic: Seeded topic/);
+      expect(draftContent).toMatch(/- evaluator: node scripts\/eval\.js/);
+      expect(draftContent).toMatch(/Launch-ready: yes/);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('guidedAutoresearchSetup', () => {
+  it('delegates to the novice bridge behavior', async () => {
+    const repo = await initRepo();
+    try {
+      const result = await withMockedTty(() => guidedAutoresearchSetup(
+        repo,
+        { topic: 'Seeded topic', evaluatorCommand: 'node scripts/eval.js', keepPolicy: 'score_improvement', slug: 'seeded-topic' },
+        makeFakeIo(['', '', '', '', '', 'launch']),
+      ));
+
+      expect(result.slug).toBe('seeded-topic');
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('checkTmuxAvailable', () => {
   beforeEach(() => {
     tmuxAvailableMock.mockReset();
@@ -312,52 +429,5 @@ describe('spawnAutoresearchTmux', () => {
 
     expect(() => spawnAutoresearchTmux('/repo/missions/demo', 'demo')).toThrow(/did not stay available after launch/);
     expect(logSpy).not.toHaveBeenCalled();
-  });
-});
-
-
-describe('guidedAutoresearchSetup', () => {
-  it('loops on low-confidence inference until clarification produces a launch-ready handoff', async () => {
-    const questionMock = vi.fn()
-      .mockResolvedValueOnce('Improve search onboarding')
-      .mockResolvedValueOnce('')
-      .mockResolvedValueOnce('Use the vitest onboarding smoke test as evaluator');
-    const closeMock = vi.fn();
-    const createPromptInterface = vi.fn(() => ({ question: questionMock, close: closeMock }));
-    const runSetupSession = vi.fn()
-      .mockReturnValueOnce({
-        missionText: 'Improve search onboarding',
-        evaluatorCommand: 'npm run test:onboarding',
-        evaluatorSource: 'inferred',
-        confidence: 0.4,
-        slug: 'search-onboarding',
-        readyToLaunch: false,
-        clarificationQuestion: 'Which script or command should prove the goal?',
-      })
-      .mockReturnValueOnce({
-        missionText: 'Improve search onboarding',
-        evaluatorCommand: 'npm run test:onboarding',
-        evaluatorSource: 'inferred',
-        confidence: 0.92,
-        slug: 'search-onboarding',
-        readyToLaunch: true,
-      });
-
-    const isTty = process.stdin.isTTY;
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true });
-
-    try {
-      const repo = await initRepo();
-      const result = await guidedAutoresearchSetup(repo, {
-        createPromptInterface: createPromptInterface as never,
-        runSetupSession,
-      });
-
-      expect(result.slug).toBe('search-onboarding');
-      expect(runSetupSession).toHaveBeenCalledTimes(2);
-      expect(closeMock).toHaveBeenCalled();
-    } finally {
-      Object.defineProperty(process.stdin, 'isTTY', { value: isTty, configurable: true });
-    }
   });
 });

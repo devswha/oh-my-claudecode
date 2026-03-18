@@ -5,14 +5,13 @@ import { join, relative, resolve, sep } from 'path';
 import { createInterface } from 'readline/promises';
 import { type AutoresearchKeepPolicy, parseSandboxContract, slugifyMissionName } from '../autoresearch/contracts.js';
 import {
-  AUTORESEARCH_SETUP_CONFIDENCE_THRESHOLD,
-  buildSetupSandboxContent,
-  type AutoresearchSetupHandoff,
-} from '../autoresearch/setup-contract.js';
-import {
-  runAutoresearchSetupSession,
-  type AutoresearchSetupSessionInput,
-} from './autoresearch-setup-session.js';
+  buildMissionContent,
+  buildSandboxContent,
+  type AutoresearchDeepInterviewResult,
+  type AutoresearchSeedInputs,
+  isLaunchReadyEvaluatorCommand,
+  writeAutoresearchDeepInterviewArtifacts,
+} from './autoresearch-intake.js';
 import { buildTmuxShellCommand, isTmuxAvailable, wrapWithLoginShell } from './tmux-utils.js';
 
 export interface InitAutoresearchOptions {
@@ -28,17 +27,54 @@ export interface InitAutoresearchResult {
   slug: string;
 }
 
-export interface GuidedAutoresearchSetupDeps {
-  createPromptInterface?: typeof createInterface;
-  runSetupSession?: (input: AutoresearchSetupSessionInput) => AutoresearchSetupHandoff;
+export interface AutoresearchQuestionIO {
+  question(prompt: string): Promise<string>;
+  close(): void;
 }
 
-function buildMissionContent(topic: string): string {
-  return `# Mission\n\n${topic}\n`;
+function createQuestionIO(): AutoresearchQuestionIO {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return {
+    question(prompt: string) {
+      return rl.question(prompt);
+    },
+    close() {
+      rl.close();
+    },
+  };
 }
 
-function buildSandboxContent(evaluatorCommand: string, keepPolicy?: AutoresearchKeepPolicy): string {
-  return buildSetupSandboxContent(evaluatorCommand, keepPolicy);
+async function promptWithDefault(io: AutoresearchQuestionIO, prompt: string, currentValue?: string): Promise<string> {
+  const suffix = currentValue?.trim() ? ` [${currentValue.trim()}]` : '';
+  const answer = await io.question(`${prompt}${suffix}\n> `);
+  return answer.trim() || currentValue?.trim() || '';
+}
+
+async function promptAction(io: AutoresearchQuestionIO, launchReady: boolean): Promise<'launch' | 'refine'> {
+  const answer = (await io.question(`\nNext step [launch/refine further] (default: ${launchReady ? 'launch' : 'refine further'})\n> `)).trim().toLowerCase();
+  if (!answer) {
+    return launchReady ? 'launch' : 'refine';
+  }
+  if (answer === 'launch') {
+    return 'launch';
+  }
+  if (answer === 'refine further' || answer === 'refine' || answer === 'r') {
+    return 'refine';
+  }
+  throw new Error('Please choose either "launch" or "refine further".');
+}
+
+function ensureLaunchReadyEvaluator(command: string): void {
+  if (!isLaunchReadyEvaluatorCommand(command)) {
+    throw new Error('Evaluator command is still a placeholder/template. Refine further before launch.');
+  }
+}
+
+export async function materializeAutoresearchDeepInterviewResult(
+  result: AutoresearchDeepInterviewResult,
+): Promise<InitAutoresearchResult> {
+  ensureLaunchReadyEvaluator(result.compileTarget.evaluatorCommand);
+  return initAutoresearchMission(result.compileTarget);
 }
 
 export async function initAutoresearchMission(opts: InitAutoresearchOptions): Promise<InitAutoresearchResult> {
@@ -106,78 +142,70 @@ export function parseInitArgs(args: readonly string[]): Partial<InitAutoresearch
   return result;
 }
 
-type QuestionInterface = { question(prompt: string): Promise<string>; close(): void };
+export async function runAutoresearchNoviceBridge(
+  repoRoot: string,
+  seedInputs: AutoresearchSeedInputs = {},
+  io: AutoresearchQuestionIO = createQuestionIO(),
+): Promise<InitAutoresearchResult> {
+  if (!process.stdin.isTTY) {
+    throw new Error('Guided setup requires an interactive terminal. Use <mission-dir> or init --topic/--evaluator/--keep-policy/--slug for non-interactive use.');
+  }
 
-async function askQuestion(rl: QuestionInterface, prompt: string): Promise<string> {
-  return (await rl.question(prompt)).trim();
+  let topic = seedInputs.topic?.trim() || '';
+  let evaluatorCommand = seedInputs.evaluatorCommand?.trim() || '';
+  let keepPolicy: AutoresearchKeepPolicy = seedInputs.keepPolicy || 'score_improvement';
+  let slug = seedInputs.slug?.trim() || '';
+
+  try {
+    while (true) {
+      topic = await promptWithDefault(io, 'Research topic/goal', topic);
+      if (!topic) {
+        throw new Error('Research topic is required.');
+      }
+
+      const evaluatorIntent = await promptWithDefault(io, '\nHow should OMC judge success? Describe it in plain language', topic);
+      evaluatorCommand = await promptWithDefault(
+        io,
+        '\nEvaluator command (leave placeholder to refine further; must output {pass:boolean, score?:number} JSON before launch)',
+        evaluatorCommand || `TODO replace with evaluator command for: ${evaluatorIntent}`,
+      );
+
+      const keepPolicyInput = await promptWithDefault(io, '\nKeep policy [score_improvement/pass_only]', keepPolicy);
+      keepPolicy = keepPolicyInput.trim().toLowerCase() === 'pass_only' ? 'pass_only' : 'score_improvement';
+
+      slug = await promptWithDefault(io, '\nMission slug', slug || slugifyMissionName(topic));
+      slug = slugifyMissionName(slug);
+
+      const deepInterview = await writeAutoresearchDeepInterviewArtifacts({
+        repoRoot,
+        topic,
+        evaluatorCommand,
+        keepPolicy,
+        slug,
+        seedInputs,
+      });
+
+      console.log(`\nDraft saved: ${deepInterview.draftArtifactPath}`);
+      console.log(`Launch readiness: ${deepInterview.launchReady ? 'ready' : deepInterview.blockedReasons.join(' ')}`);
+
+      const action = await promptAction(io, deepInterview.launchReady);
+      if (action === 'refine') {
+        continue;
+      }
+
+      return materializeAutoresearchDeepInterviewResult(deepInterview);
+    }
+  } finally {
+    io.close();
+  }
 }
 
 export async function guidedAutoresearchSetup(
   repoRoot: string,
-  deps: GuidedAutoresearchSetupDeps = {},
+  seedInputs: AutoresearchSeedInputs = {},
+  io: AutoresearchQuestionIO = createQuestionIO(),
 ): Promise<InitAutoresearchResult> {
-  if (!process.stdin.isTTY) {
-    throw new Error('Guided setup requires an interactive terminal. Use --mission, --sandbox, --keep-policy, and --slug flags for non-interactive use.');
-  }
-
-  const makeInterface = deps.createPromptInterface ?? createInterface;
-  const runSetupSession = deps.runSetupSession ?? runAutoresearchSetupSession;
-  const rl = makeInterface({ input: process.stdin, output: process.stdout }) as QuestionInterface;
-
-  try {
-    const topic = await askQuestion(rl, 'What should autoresearch improve or prove for this repo?\n> ');
-    if (!topic) {
-      throw new Error('Research mission is required.');
-    }
-
-    const explicitEvaluator = await askQuestion(
-      rl,
-      '\nOptional evaluator command (leave blank and OMC will infer one if confidence is high)\n> ',
-    );
-
-    const clarificationAnswers: string[] = [];
-    let handoff: AutoresearchSetupHandoff | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      handoff = runSetupSession({
-        repoRoot,
-        missionText: topic,
-        ...(explicitEvaluator ? { explicitEvaluatorCommand: explicitEvaluator } : {}),
-        clarificationAnswers,
-      });
-
-      if (handoff.readyToLaunch) {
-        break;
-      }
-
-      const question = handoff.clarificationQuestion
-        ?? 'I need one more detail before launch. What should the evaluator command verify?';
-      const answer = await askQuestion(rl, `\n${question}\n> `);
-      if (!answer) {
-        throw new Error('Autoresearch setup requires clarification before launch.');
-      }
-      clarificationAnswers.push(answer);
-    }
-
-    if (!handoff || !handoff.readyToLaunch) {
-      throw new Error(
-        `Autoresearch setup could not infer a launch-ready evaluator with confidence >= ${AUTORESEARCH_SETUP_CONFIDENCE_THRESHOLD}.`,
-      );
-    }
-
-    process.stdout.write(
-      `\nSetup summary\n- mission: ${handoff.missionText}\n- evaluator: ${handoff.evaluatorCommand}\n- confidence: ${handoff.confidence}\n`,
-    );
-
-    return initAutoresearchMission({
-      topic: handoff.missionText,
-      evaluatorCommand: handoff.evaluatorCommand,
-      keepPolicy: handoff.keepPolicy,
-      slug: handoff.slug || slugifyMissionName(handoff.missionText),
-      repoRoot,
-    });
-  } finally {
-    rl.close();
-  }
+  return runAutoresearchNoviceBridge(repoRoot, seedInputs, io);
 }
 
 export function checkTmuxAvailable(): boolean {
