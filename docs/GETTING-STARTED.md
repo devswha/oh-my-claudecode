@@ -41,8 +41,6 @@ After adding the marketplace, install the plugin:
 /plugin install oh-my-claudecode
 ```
 
-This command automatically handles hook configuration as well.
-
 ### Step 3: Run initial setup
 
 After installation, enter one of the following in Claude Code:

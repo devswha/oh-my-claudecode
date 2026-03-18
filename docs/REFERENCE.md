@@ -176,7 +176,6 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool. For full agent
 | **Research** | — | `document-specialist` | — |
 | **Frontend** | `designer-low` | `designer` | `designer-high` |
 | **Docs** | `writer` | — | — |
-| **Visual** | — | `vision` | — |
 | **Planning** | — | — | `planner` |
 | **Critique** | — | — | `critic` |
 | **Pre-Planning** | — | — | `analyst` |
@@ -201,7 +200,6 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool. For full agent
 | UI component / system | `designer` / `designer-high` | sonnet / opus |
 | Write docs | `writer` | haiku |
 | Research docs/APIs | `document-specialist` | sonnet |
-| Analyze images | `vision` | sonnet |
 | Strategic planning | `planner` | opus |
 | Review/critique plan | `critic` | opus |
 | Pre-planning analysis | `analyst` | opus |
@@ -216,7 +214,7 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool. For full agent
 
 ## Skills
 
-34 skills total (33 canonical + 1 deprecated alias `psm`). For skill internals and composition layers, see [ARCHITECTURE.md](./ARCHITECTURE.md).
+28 skills total (27 canonical + 1 deprecated alias `psm`). For skill internals and composition layers, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 | Skill | Trigger / Command | Description |
 |-------|-------------------|-------------|
@@ -504,7 +502,7 @@ Checks: dependencies, configuration errors, hook status, agent availability, ski
 Or manually remove installed files:
 
 ```bash
-rm ~/.claude/agents/{architect,document-specialist,explore,designer,writer,vision,critic,analyst,executor,qa-tester}.md
+rm ~/.claude/agents/{architect,document-specialist,explore,designer,writer,critic,analyst,executor,qa-tester}.md
 rm ~/.claude/commands/{analyze,autopilot,deepsearch,plan,review,ultrawork}.md
 ```
 

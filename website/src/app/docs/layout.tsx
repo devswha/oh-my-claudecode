@@ -7,7 +7,12 @@ export default function Layout({ children }: { children: ReactNode }) {
     <DocsLayout
       tree={source.pageTree}
       nav={{
-        title: 'Oh My ClaudeCode',
+        title: (
+          <div className="flex flex-col">
+            <span>Oh My ClaudeCode</span>
+            <span className="text-xs text-fd-muted-foreground">v4.8.2</span>
+          </div>
+        ),
         url: '/docs',
       }}
       sidebar={{

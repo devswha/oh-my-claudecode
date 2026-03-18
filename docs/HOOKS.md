@@ -1,10 +1,10 @@
 # Hooks System
 
-> OMC's 31 hooks intercept Claude Code lifecycle events to enable magic keywords, context injection, and quality enforcement.
+> OMC's 20 hooks intercept Claude Code lifecycle events to enable magic keywords, context injection, and quality enforcement.
 
 ## What Are Hooks?
 
-Hooks are scripts that execute automatically in response to Claude Code lifecycle events. oh-my-claudecode extends Claude Code's default behavior with 31 hooks.
+Hooks are scripts that execute automatically in response to Claude Code lifecycle events. oh-my-claudecode extends Claude Code's default behavior with 20 hooks.
 
 When a user submits a prompt, a tool runs, or a session starts/ends, hooks fire automatically to inject additional context, activate modes, and manage state.
 
@@ -59,8 +59,6 @@ Handle orchestration, keyword detection, and recovery.
 | Hook | Description |
 |------|-------------|
 | keyword-detector | Detects magic keywords (ultrawork, ralph, etc.) |
-| omc-orchestrator | Enforces orchestrator behavior and delegation |
-| recovery | Handles edit errors, session recovery, context window recovery |
 
 ### Context Management Hooks
 
@@ -71,7 +69,6 @@ Manage memory, project state, and compaction.
 | notepad | Compaction-resistant memory system |
 | project-memory | Manages project-level memory |
 | pre-compact | Processes state before compaction |
-| preemptive-compaction | Monitors context usage |
 
 ### Quality / Verification Hooks
 
@@ -103,7 +100,7 @@ Separate hook names with commas to skip only those hooks.
 
 ## Lifecycle Events
 
-Claude Code emits events throughout a session. OMC attaches hooks to these events to extend behavior. There are 10 lifecycle events.
+Claude Code emits events throughout a session. OMC attaches hooks to these events to extend behavior. There are 11 lifecycle events.
 
 ### UserPromptSubmit
 
@@ -275,13 +272,6 @@ Detects magic keywords in user prompts and invokes the corresponding skill.
 
 See the [Magic Keywords](#magic-keywords) section for the full keyword list.
 
-#### omc-orchestrator
-
-Enforces orchestrator behavior and delegation rules.
-
-- **Behavior**: Instructs Claude to delegate to the appropriate agent based on task type
-- **Rules**: Multi-file changes, refactoring, debugging, and similar tasks are delegated to specialized agents
-
 #### persistent-mode
 
 Maintains active execution mode state across sessions.
@@ -290,15 +280,6 @@ Maintains active execution mode state across sessions.
 - **Behavior**: Injects a reinforcement message when an active mode (ralph, ultrawork, autopilot, etc.) is present
 - **Message**: Encourages continued work when incomplete tasks remain
 - **Cancel**: Use `/oh-my-claudecode:cancel` to deactivate modes
-
-### Recovery Hook
-
-#### recovery
-
-Handles edit errors, session recovery, and context window recovery.
-
-- **Behavior**: Suggests recovery strategies when tool execution fails
-- **Scope**: Edit failures, abnormal session termination, context limit exceeded
 
 ### Mode State Management
 
@@ -372,20 +353,6 @@ Two types of data are stored in project-memory:
 - **Notes**: Learned facts about the project (architecture patterns, bug history, etc.)
 - **Directives**: Instructions to follow when working on the project
 
-### rules-injector
-
-Parses YAML frontmatter and injects dynamic rules.
-
-- **Behavior**: Reads rules from the project's CLAUDE.md, AGENTS.md, and similar files, then injects them into the context
-- **Use case**: Automatically applies project-specific conventions, coding styles, and prohibited patterns
-
-### directory-readme-injector
-
-Injects directory README files into the context.
-
-- **Behavior**: Reads README.md, AGENTS.md, and similar files from the working directory and adds them to the context
-- **Use case**: Automatically references per-directory guidelines and documentation
-
 ### pre-compact
 
 Preserves important state immediately before compaction.
@@ -394,20 +361,6 @@ Preserves important state immediately before compaction.
 - **Behavior**: Summarizes and preserves the current work state, in-progress TODOs, and critical context
 - **Purpose**: Retains essential information so work can resume after compaction
 
-### preemptive-compaction
-
-Monitors context usage to prevent hitting the limit.
-
-- **Behavior**: Warns and suggests preemptive actions when context usage approaches the threshold
-- **Use case**: Prevents context overflow during large file reads or long sessions
-
-### beads-context
-
-Bridges context across sessions.
-
-- **Behavior**: Passes key information from a previous session into the new session
-- **Use case**: Prevents context loss in multi-session work
-
 ### Context Preservation Strategy
 
 OMC's context management hooks cooperate with the following strategy:
@@ -415,18 +368,14 @@ OMC's context management hooks cooperate with the following strategy:
 ```
 Session Start
   → Load project-memory
-  → rules-injector injects rules
-  → directory-readme-injector injects README
     → [Work in progress]
     → Write important info to notepad
     → Update project-memory
-      → [Context limit approaching]
-      → preemptive-compaction warning
-        → [Compaction fires]
-        → pre-compact preserves state
-        → project-memory preserved
-          → [After compaction]
-          → Restored via notepad / project-memory
+      → [Compaction fires]
+      → pre-compact preserves state
+      → project-memory preserved
+        → [After compaction]
+        → Restored via notepad / project-memory
 ```
 
 ---
