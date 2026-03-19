@@ -1,66 +1,66 @@
 ---
 title: Designer
-description: 프로덕션 수준의 UI를 설계하고 구현하는 디자이너-개발자 에이전트.
+description: A designer-developer agent that designs and implements production-quality UI.
 ---
 
-## 개요
+## Overview
 
-Designer는 눈에 띄는 프로덕션 수준 UI를 구현하는 에이전트입니다.
-인터랙션 설계, UI 솔루션 설계, 프레임워크에 맞는 컴포넌트 구현,
-시각적 마무리(타이포그래피, 색상, 모션, 레이아웃)까지 맡습니다.
+Designer is an agent that implements distinctive, production-quality UI.
+It handles interaction design, UI solution design, framework-appropriate component implementation,
+and visual finishing touches (typography, color, motion, layout).
 
-어디서나 본 듯한 인터페이스는 사용자 신뢰와 참여를 떨어뜨립니다.
-잊히지 않는 인터페이스와 평범한 인터페이스의 차이는
-모든 디테일에 대한 의도성 -- 폰트 선택, 간격 리듬, 색상 조화, 애니메이션 타이밍 -- 에 있습니다.
+Generic-looking interfaces reduce user trust and engagement.
+The difference between a memorable interface and an ordinary one lies in intentionality applied to every detail —
+font choice, spacing rhythm, color harmony, animation timing.
 
-## 언제 쓰는가
+## When to Use
 
-- 새 UI 컴포넌트나 페이지를 만들 때
-- 기존 UI의 시각적 품질을 개선할 때
-- 반응형/접근성을 갖춘 프로덕션 수준 UI가 필요할 때
-- 디자인 시스템에 맞는 컴포넌트를 구축할 때
+- When creating new UI components or pages
+- When improving the visual quality of existing UI
+- When production-quality UI with responsiveness and accessibility is needed
+- When building components that fit the design system
 
-## 사용 예시
+## Usage Examples
 
 ```
-"설정 페이지를 만들어줘"
-"이 대시보드의 디자인을 개선해줘"
-"이 랜딩 페이지를 반응형으로 구현해줘"
+"Create a settings page"
+"Improve the design of this dashboard"
+"Implement this landing page responsively"
 ```
 
-## 설계 프로세스
+## Design Process
 
-1. **프레임워크 감지**: package.json에서 React/Next/Vue/Angular/Svelte/Solid를 확인합니다
-2. **미적 방향 결정**: 코딩 전에 목적, 톤, 제약, 차별화 포인트를 결정합니다
-3. **기존 패턴 연구**: 코드베이스의 컴포넌트 구조, 스타일링 방식, 애니메이션 라이브러리를 파악합니다
-4. **구현**: 프로덕션 수준이면서 앱과 톤이 맞는 코드를 작성합니다
-5. **검증**: 렌더링 확인, 콘솔 에러 없음, 반응형 브레이크포인트를 테스트합니다
+1. **Framework Detection**: Check package.json for React/Next/Vue/Angular/Svelte/Solid
+2. **Aesthetic Direction**: Before coding, determine purpose, tone, constraints, and differentiators
+3. **Study Existing Patterns**: Understand component structure, styling approach, and animation libraries in the codebase
+4. **Implementation**: Write code that is production-quality and tonally consistent with the app
+5. **Verification**: Confirm rendering, no console errors, test responsive breakpoints
 
-## 디자인 원칙
+## Design Principles
 
-- **타이포그래피**: Arial, Inter, Roboto, 시스템 폰트 대신 특색 있는 폰트를 사용합니다
-- **색상**: CSS 변수로 관리하는 응집력 있는 팔레트. 주요 색상 + 강조 색상
-- **모션**: 페이지 로드, 호버, 전환 등 고영향 순간에 집중합니다
-- **레이아웃**: 예측 가능하지 않은 배치로 관심을 유도합니다
+- **Typography**: Use distinctive fonts rather than Arial, Inter, Roboto, or system fonts
+- **Color**: A cohesive palette managed with CSS variables. Primary color + accent color
+- **Motion**: Focus on high-impact moments — page load, hover, transitions
+- **Layout**: Draw interest through unexpected arrangements
 
-### 피해야 할 것
+### Things to Avoid
 
-- 보라색 그라데이션 + 화이트 배경 (AI slop)
-- 기본 부트스트랩 스타일
-- 뻔한 히어로 섹션
-- 쿠키 커터 디자인
+- Purple gradients on white backgrounds (AI slop)
+- Default Bootstrap styles
+- Generic hero sections
+- Cookie-cutter design
 
-## 다른 에이전트와의 조합
+## Combining with Other Agents
 
-- **executor**: 비 UI 로직은 executor 몫입니다
-- **architect**: 프론트엔드 아키텍처 결정은 architect와 협력합니다
-- **writer**: UI 문서화는 writer에 넘깁니다
+- **executor**: Non-UI logic is executor's responsibility
+- **architect**: Collaborates with architect for frontend architecture decisions
+- **writer**: UI documentation is passed to writer
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
+| Item | Value |
 |------|-----|
-| 모델 | sonnet |
-| 서브에이전트 타입 | `oh-my-claudecode:designer` |
-| 레인 | Domain |
-| 티어 변형 | `designer-low` (haiku), `designer-high` (opus) |
+| Model | sonnet |
+| Subagent Type | `oh-my-claudecode:designer` |
+| Lane | Domain |
+| Tier Variants | `designer-low` (haiku), `designer-high` (opus) |

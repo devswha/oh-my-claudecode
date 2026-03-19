@@ -1,61 +1,61 @@
 ---
 title: Analyst
-description: 요구사항 분석과 수락 기준 정의를 담당하는 사전 계획 컨설턴트.
+description: A pre-planning consultant that analyzes requirements and defines acceptance criteria.
 ---
 
-## 개요
+## Overview
 
-Analyst는 결정된 제품 범위를 구현 가능한 수락 기준(acceptance criteria)으로 바꾸는 에이전트입니다.
-계획 수립 전에 요구사항의 빈틈을 잡아내는 게 핵심입니다.
+Analyst is an agent that converts decided product scope into implementable acceptance criteria.
+Its core purpose is to catch gaps in requirements before planning begins.
 
-"이걸 만들 수 있는가?"에 집중하며, "이걸 만들어야 하는가?"라는 시장/가치 판단은 하지 않습니다.
-계획 전에 요구사항 갭을 발견하는 것이 구현 후 발견하는 것보다 100배 저렴합니다.
+It focuses on "can this be built?" and does not make market/value judgments about "should this be built?"
+Discovering requirement gaps before planning is 100x cheaper than discovering them after implementation.
 
-Analyst는 읽기 전용(read-only) 에이전트입니다.
+Analyst is a read-only agent.
 
-## 언제 쓰는가
+## When to Use
 
-- 기능 구현 전에 요구사항의 완전성을 검증할 때
-- 누락된 질문, 정의되지 않은 경계 조건을 찾을 때
-- 수락 기준이 테스트 가능한지 확인할 때
-- scope creep 위험을 사전에 식별할 때
+- When verifying the completeness of requirements before implementing a feature
+- When finding missing questions and undefined boundary conditions
+- When confirming that acceptance criteria are testable
+- When identifying scope creep risks in advance
 
-## 사용 예시
+## Usage Examples
 
 ```
-"사용자 삭제 기능의 요구사항을 분석해줘"
-"이 PRD에서 빠진 것들을 찾아줘"
-"이 기능의 엣지 케이스를 정리해줘"
+"Analyze the requirements for the user deletion feature"
+"Find what's missing in this PRD"
+"Summarize the edge cases for this feature"
 ```
 
-Analyst는 각 요구사항에 대해 아래 질문을 체크합니다.
-- 완전한가? 테스트 가능한가? 모호하지 않은가?
-- 검증되지 않은 가정은 무엇인가?
-- 범위에 포함되는 것과 명시적으로 제외되는 것은?
-- 선행 의존성은 무엇인가?
+Analyst checks the following questions for each requirement:
+- Is it complete? Is it testable? Is it unambiguous?
+- What are the unvalidated assumptions?
+- What is explicitly included and excluded from scope?
+- What are the prerequisite dependencies?
 
-## 출력 형식
+## Output Format
 
-Analyst는 분석 보고서를 정해진 형식으로 만듭니다.
+Analyst produces an analysis report in a structured format.
 
-- **Missing Questions**: 아직 묻지 않은 질문과 그 중요성
-- **Undefined Guardrails**: 경계 정의가 필요한 영역
-- **Scope Risks**: scope creep 가능 영역과 방지 전략
-- **Unvalidated Assumptions**: 가정과 검증 방법
-- **Missing Acceptance Criteria**: 측정 가능한 성공 기준
-- **Edge Cases**: 비정상적 시나리오와 처리 방안
+- **Missing Questions**: Questions not yet asked and their importance
+- **Undefined Guardrails**: Areas where boundary definitions are needed
+- **Scope Risks**: Potential scope creep areas and prevention strategies
+- **Unvalidated Assumptions**: Assumptions and how to validate them
+- **Missing Acceptance Criteria**: Measurable success criteria
+- **Edge Cases**: Abnormal scenarios and handling approaches
 
-## 다른 에이전트와의 조합
+## Combining with Other Agents
 
-- **planner**: Analyst의 분석 결과를 바탕으로 계획을 수립합니다. Planner는 계획 생성 전에 analyst에 먼저 자문합니다
-- **architect**: 코드 분석이 필요한 경우 architect에 위임합니다
-- **critic**: 계획이 이미 존재하면 critic이 검토합니다
+- **planner**: Planner creates a plan based on Analyst's analysis. Planner consults analyst before generating a plan
+- **architect**: Delegates to architect when code analysis is needed
+- **critic**: If a plan already exists, critic reviews it
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
+| Item | Value |
 |------|-----|
-| 모델 | opus |
-| 서브에이전트 타입 | `oh-my-claudecode:analyst` |
-| 레인 | Build & Analysis |
-| 읽기 전용 | Yes (Write, Edit 차단) |
+| Model | opus |
+| Subagent Type | `oh-my-claudecode:analyst` |
+| Lane | Build & Analysis |
+| Read-Only | Yes (Write, Edit blocked) |

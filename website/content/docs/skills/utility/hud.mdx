@@ -1,36 +1,36 @@
 ---
 title: HUD
-description: OMC 상태를 실시간으로 표시하는 HUD(Heads-Up Display) 설정 스킬
+description: A skill for configuring and managing the HUD (Heads-Up Display) that shows real-time OMC status
 ---
 
-## 개요
+## Overview
 
-HUD는 Claude Code의 상태 라인에 OMC 실시간 상태를 표시하는 Heads-Up Display를 설정하고 관리하는 스킬입니다. 활성 모드, 컨텍스트 사용량, 에이전트 상태, TODO 진행 상황 등을 한눈에 볼 수 있습니다.
+HUD is a skill that configures and manages a Heads-Up Display showing real-time OMC status in Claude Code's status line. At a glance you can see active modes, context usage, agent status, TODO progress, and more.
 
-## 사용법
+## Usage
 
 ```bash
-/oh-my-claudecode:hud              # 현재 상태 표시 (필요 시 자동 설정)
-/oh-my-claudecode:hud setup        # HUD 상태 라인 설치/수리
-/oh-my-claudecode:hud minimal      # 최소 디스플레이
-/oh-my-claudecode:hud focused      # 포커스 디스플레이 (기본값)
-/oh-my-claudecode:hud full         # 전체 디스플레이
-/oh-my-claudecode:hud status       # 상세 상태
+/oh-my-claudecode:hud              # Show current status (auto-configure if needed)
+/oh-my-claudecode:hud setup        # Install/repair the HUD status line
+/oh-my-claudecode:hud minimal      # Minimal display
+/oh-my-claudecode:hud focused      # Focused display (default)
+/oh-my-claudecode:hud full         # Full display
+/oh-my-claudecode:hud status       # Detailed status
 ```
 
-## 프리셋
+## Presets
 
 ### Minimal
 
-핵심 정보만 표시합니다.
+Shows only essential information.
 
 ```
 [OMC] ralph | ultrawork | todos:2/5
 ```
 
-### Focused (기본값)
+### Focused (default)
 
-관련 요소를 모두 표시합니다.
+Shows all relevant elements.
 
 ```
 [OMC] branch:main | ralph:3/10 | US-002 | ultrawork | ctx:67% | agents:2 | todos:2/5
@@ -38,7 +38,7 @@ HUD는 Claude Code의 상태 라인에 OMC 실시간 상태를 표시하는 Head
 
 ### Full
 
-에이전트 상세 정보를 포함한 멀티라인 디스플레입니다.
+Multi-line display with detailed agent information.
 
 ```
 [OMC] repo:omc branch:main | ralph:3/10 | US-002 | ctx:[████░░]67% | agents:3 | todos:2/5
@@ -47,28 +47,28 @@ HUD는 Claude Code의 상태 라인에 OMC 실시간 상태를 표시하는 Head
 └─ s executor     1m   implementing validation logic
 ```
 
-## 디스플레이 요소
+## Display Elements
 
-| 요소 | 설명 |
-|------|------|
-| `[OMC]` | 모드 식별자 |
-| `repo:name` | Git 저장소 이름 |
-| `branch:name` | Git 브랜치 이름 |
-| `ralph:3/10` | Ralph 반복 횟수/최대 |
-| `US-002` | 현재 PRD 스토리 ID |
-| `ctx:67%` | 컨텍스트 윈도우 사용량 |
-| `agents:2` | 실행 중인 서브에이전트 수 |
-| `todos:2/5` | TODO 완료 상태 |
+| Element | Description |
+|---------|-------------|
+| `[OMC]` | Mode identifier |
+| `repo:name` | Git repository name |
+| `branch:name` | Git branch name |
+| `ralph:3/10` | Ralph iteration count / maximum |
+| `US-002` | Current PRD story ID |
+| `ctx:67%` | Context window usage |
+| `agents:2` | Number of running sub-agents |
+| `todos:2/5` | TODO completion status |
 
-## 색상 코드
+## Color Codes
 
-- **초록**: 정상/건강
-- **노랑**: 경고 (컨텍스트 > 70%, ralph > 7)
-- **빨강**: 위험 (컨텍스트 > 85%, ralph 최대)
+- **Green**: Normal / healthy
+- **Yellow**: Warning (context > 70%, ralph > 7)
+- **Red**: Critical (context > 85%, ralph at maximum)
 
-## 설정
+## Configuration
 
-`~/.claude/settings.json`의 `omcHud` 키에서 설정합니다.
+Configure under the `omcHud` key in `~/.claude/settings.json`.
 
 ```json
 {
@@ -86,17 +86,17 @@ HUD는 Claude Code의 상태 라인에 OMC 실시간 상태를 표시하는 Head
 }
 ```
 
-사용 가능한 프리셋: `minimal`, `focused`, `full`, `dense`, `analytics`, `opencode`
+Available presets: `minimal`, `focused`, `full`, `dense`, `analytics`, `opencode`
 
-## 관련 스킬
+## Related Skills
 
-- [omc-setup](/docs/skills/utility/omc-setup) - 전체 OMC 설정 (HUD 포함)
+- [omc-setup](/docs/skills/utility/omc-setup) - Full OMC configuration (includes HUD)
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
-|------|-----|
-| 호출 | `/oh-my-claudecode:hud` |
-| 매직 키워드 | - |
-| 카테고리 | Utility |
-| 설정 위치 | `~/.claude/settings.json` (`omcHud` 키) |
+| Item | Value |
+|------|-------|
+| Invocation | `/oh-my-claudecode:hud` |
+| Magic Keyword | - |
+| Category | Utility |
+| Config Location | `~/.claude/settings.json` (`omcHud` key) |

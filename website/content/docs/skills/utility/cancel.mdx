@@ -1,81 +1,81 @@
 ---
 title: Cancel
-description: 모든 활성 OMC 모드를 감지하고 취소하는 통합 취소 스킬
+description: A unified cancellation skill that detects and cancels all active OMC modes
 ---
 
-## 개요
+## Overview
 
-Cancel은 현재 활성 중인 OMC 모드를 자동으로 감지하고 취소하는 통합 취소 스킬입니다. 의존성 순서를 고려해서 연결된 모드를 올바른 순서로 정리합니다.
+Cancel is a unified cancellation skill that automatically detects and cancels currently active OMC modes. It cleans up linked modes in the correct order, respecting dependency relationships.
 
-모든 OMC 모드의 표준 종료 방법이고, 작업 완료 후 상태 정리에도 씁니다.
+This is the standard way to exit any OMC mode, and is also used to clean up state after work is complete.
 
-## 사용법
+## Usage
 
 ```bash
 /oh-my-claudecode:cancel
 /oh-my-claudecode:cancel --force
 ```
 
-매직 키워드로도 활성화됩니다.
+Also activated by magic keywords:
 
 ```
 cancelomc
 stopomc
 ```
 
-## 자동 감지 순서
+## Auto-Detection Order
 
-Cancel은 다음 순서로 활성 모드를 감지하고 취소합니다.
+Cancel detects and cancels active modes in the following order:
 
-1. Autopilot (연결된 ralph/ultraqa 포함)
-2. Ralph (연결된 ultrawork 포함)
-3. Ultrawork (단독)
-4. UltraQA (단독)
-5. Ultrapilot (단독)
-6. Pipeline (단독)
-7. Team (Claude Code 네이티브)
-8. OMC Teams (tmux CLI 워커)
-9. Plan Consensus (단독)
+1. Autopilot (including linked ralph/ultraqa)
+2. Ralph (including linked ultrawork)
+3. Ultrawork (standalone)
+4. UltraQA (standalone)
+5. Ultrapilot (standalone)
+6. Pipeline (standalone)
+7. Team (Claude Code native)
+8. OMC Teams (tmux CLI workers)
+9. Plan Consensus (standalone)
 
-## Force 모드
+## Force Mode
 
-`--force` 또는 `--all`을 쓰면 모든 세션과 레거시 아티팩트를 완전히 삭제합니다.
+Using `--force` or `--all` completely deletes all sessions and legacy artifacts.
 
 ```bash
 /oh-my-claudecode:cancel --force
 ```
 
-워크스페이스를 완전히 초기화해야 할 때 씁니다.
+Use this when you need to fully reset the workspace.
 
-## 모드별 취소 동작
+## Cancellation Behavior by Mode
 
 ### Autopilot
-현재 Phase를 저장하고 비활성화합니다. 연결된 ralph와 ultraqa도 정리합니다. 재개가 가능합니다.
+Saves the current phase and deactivates. Also cleans up linked ralph and ultraqa. Resumable.
 
 ### Ralph
-지속 모드를 비활성화합니다. 연결된 ultrawork가 있으면 함께 정리합니다.
+Deactivates persistent mode. Cleans up linked ultrawork if present.
 
 ### Team
-각 팀원에게 shutdown_request를 전송하고 응답을 대기합니다. 응답 후 TeamDelete로 정리합니다. 연결된 ralph가 있으면 함께 정리합니다.
+Sends a shutdown_request to each team member and waits for responses. Cleans up with TeamDelete after acknowledgment. Cleans up linked ralph if present.
 
-## 보존되는 상태
+## Preserved State
 
-| 모드 | 상태 보존 | 재개 명령 |
-|------|-----------|-----------|
-| Autopilot | O (Phase, 파일, 스펙, 계획) | `/oh-my-claudecode:autopilot` |
-| Ralph | X | - |
-| Ultrawork | X | - |
-| Team | X | - |
-| Plan Consensus | O (계획 파일 경로) | - |
+| Mode | State Preserved | Resume Command |
+|------|-----------------|----------------|
+| Autopilot | Yes (phase, files, spec, plan) | `/oh-my-claudecode:autopilot` |
+| Ralph | No | - |
+| Ultrawork | No | - |
+| Team | No | - |
+| Plan Consensus | Yes (plan file path) | - |
 
-## 관련 스킬
+## Related Skills
 
-모든 워크플로우 스킬은 cancel로 종료할 수 있습니다.
+All workflow skills can be terminated with cancel.
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
-|------|-----|
-| 호출 | `/oh-my-claudecode:cancel` |
-| 매직 키워드 | `cancelomc`, `stopomc` |
-| 카테고리 | Utility |
+| Item | Value |
+|------|-------|
+| Invocation | `/oh-my-claudecode:cancel` |
+| Magic Keyword | `cancelomc`, `stopomc` |
+| Category | Utility |

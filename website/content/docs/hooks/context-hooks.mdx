@@ -1,70 +1,70 @@
 ---
-title: 컨텍스트 관리 훅
-description: 메모리, 프로젝트 상태, 컴팩션을 관리하는 OMC 훅을 설명합니다.
+title: Context Management Hooks
+description: Explains OMC hooks that manage memory, project state, and compaction.
 ---
 
-## 컨텍스트 관리가 필요한 이유
+## Why Context Management is Needed
 
-Claude Code의 컨텍스트 윈도우는 유한합니다.
-긴 세션에서는 컴팩션(compaction)이 발생하여 이전 대화 내용이 요약됩니다.
-OMC의 컨텍스트 관리 훅은 컴팩션을 대비하고, 중요한 정보를 보존하며,
-프로젝트 수준의 메모리를 유지합니다.
+Claude Code's context window is finite.
+In long sessions, compaction occurs and previous conversation content is summarized.
+OMC's context management hooks prepare for compaction, preserve important information,
+and maintain project-level memory.
 
 ## notepad
 
-컴팩션에 내성을 가진 메모리 시스템입니다.
+A memory system resistant to compaction.
 
-- **저장 경로**: `.omc/notepad.md`
-- **MCP 도구**: `notepad_read`, `notepad_write_priority`, `notepad_write_working`, `notepad_write_manual`
-- **동작**: 중요한 정보를 notepad에 기록하면 컴팩션 후에도 유지됨
+- **Storage path**: `.omc/notepad.md`
+- **MCP tools**: `notepad_read`, `notepad_write_priority`, `notepad_write_working`, `notepad_write_manual`
+- **Behavior**: Information written to the notepad is preserved even after compaction
 
-notepad는 세 가지 우선순위를 지원합니다.
+The notepad supports three priority levels.
 
-| 우선순위 | 도구 | 설명 |
+| Priority | Tool | Description |
 |---------|------|------|
-| Priority | `notepad_write_priority` | 절대 잃으면 안 되는 정보 |
-| Working | `notepad_write_working` | 현재 작업 진행 상황 |
-| Manual | `notepad_write_manual` | 수동으로 기록하는 메모 |
+| Priority | `notepad_write_priority` | Information that must never be lost |
+| Working | `notepad_write_working` | Current task progress |
+| Manual | `notepad_write_manual` | Manually recorded notes |
 
-`notepad_prune`으로 오래된 항목을 정리하고, `notepad_stats`로 상태를 확인할 수 있습니다.
+Use `notepad_prune` to clean up old entries, and `notepad_stats` to check status.
 
 ## project-memory
 
-프로젝트 수준의 영구 메모리를 관리합니다.
+Manages project-level persistent memory.
 
-- **저장 경로**: `.omc/project-memory.json`
-- **MCP 도구**: `project_memory_read`, `project_memory_write`, `project_memory_add_note`, `project_memory_add_directive`
-- **관련 훅**:
-  - `project-memory-session.mjs` (SessionStart): 세션 시작 시 프로젝트 메모리 로드
-  - `project-memory-posttool.mjs` (PostToolUse): 도구 사용 후 메모리 업데이트
-  - `project-memory-precompact.mjs` (PreCompact): 컴팩션 전 메모리 보존
+- **Storage path**: `.omc/project-memory.json`
+- **MCP tools**: `project_memory_read`, `project_memory_write`, `project_memory_add_note`, `project_memory_add_directive`
+- **Related hooks**:
+  - `project-memory-session.mjs` (SessionStart): Loads project memory at session start
+  - `project-memory-posttool.mjs` (PostToolUse): Updates memory after tool use
+  - `project-memory-precompact.mjs` (PreCompact): Preserves memory before compaction
 
-project-memory에는 두 가지 유형의 데이터를 저장합니다.
+Two types of data are stored in project-memory.
 
-- **Notes**: 프로젝트에 대한 학습된 사실 (아키텍처 패턴, 버그 기록 등)
-- **Directives**: 프로젝트 수행 시 따라야 할 지시 사항
+- **Notes**: Learned facts about the project (architecture patterns, bug records, etc.)
+- **Directives**: Instructions that must be followed when working on the project
 
 ## pre-compact
 
-컴팩션 직전에 중요한 상태를 보존합니다.
+Preserves important state just before compaction.
 
-- **이벤트**: PreCompact
-- **동작**: 현재 작업 상태, 진행 중인 TODO, 중요 컨텍스트를 요약/보존
-- **목적**: 컴팩션 후에도 작업을 이어갈 수 있도록 핵심 정보 유지
+- **Event**: PreCompact
+- **Behavior**: Summarizes/preserves the current task state, ongoing TODOs, and critical context
+- **Purpose**: Keeps essential information so work can continue after compaction
 
-## 컨텍스트 보존 전략
+## Context Preservation Strategy
 
-OMC의 컨텍스트 관리 훅들은 아래 전략으로 협력합니다.
+OMC's context management hooks collaborate with the following strategy:
 
 ```
-세션 시작
-  → project-memory 로드 (project-memory-session.mjs)
-    → [작업 진행]
-    → notepad에 중요 정보 기록
-    → project-memory 업데이트 (project-memory-posttool.mjs)
-      → [컴팩션 발생]
-      → pre-compact 상태 보존 (pre-compact.mjs)
-      → project-memory 보존 (project-memory-precompact.mjs)
-        → [컴팩션 후]
-        → notepad/project-memory로 복원
+Session start
+  → Load project-memory (project-memory-session.mjs)
+    → [Work in progress]
+    → Record important info to notepad
+    → Update project-memory (project-memory-posttool.mjs)
+      → [Compaction occurs]
+      → Preserve state pre-compact (pre-compact.mjs)
+      → Preserve project-memory (project-memory-precompact.mjs)
+        → [After compaction]
+        → Restore from notepad/project-memory
 ```

@@ -1,13 +1,13 @@
 ---
 title: Plan
-description: 인터뷰 기반 전략 계획 수립 스킬로 4가지 모드를 지원
+description: Strategic planning skill supporting 4 modes including interview-based planning
 ---
 
-## 개요
+## Overview
 
-Plan은 인터뷰, 직접, 합의, 리뷰 4가지 모드를 지원하는 전략 계획 수립 스킬입니다. 요청이 얼마나 구체적인지에 따라 자동으로 모드를 선택하고, 코드베이스를 먼저 탐색한 뒤 사용자에게 질문합니다.
+Plan is a strategic planning skill that supports four modes: interview, direct, consensus, and review. It automatically selects a mode based on how specific the request is, explores the codebase first, then asks the user questions.
 
-## 사용법
+## Usage
 
 ```bash
 /oh-my-claudecode:omc-plan "implement user authentication"
@@ -16,7 +16,7 @@ Plan은 인터뷰, 직접, 합의, 리뷰 4가지 모드를 지원하는 전략 
 /oh-my-claudecode:omc-plan --review
 ```
 
-매직 키워드로도 활성화됩니다.
+Also activated via magic keywords.
 
 ```
 plan this feature
@@ -24,78 +24,78 @@ plan the migration
 let's plan the refactoring
 ```
 
-## 모드 선택
+## Mode Selection
 
-| 모드 | 트리거 | 동작 |
-|------|--------|------|
-| Interview | 광범위한 요청 (기본) | 인터랙티브 요구사항 수집 |
-| Direct | `--direct` 또는 상세한 요청 | 인터뷰 건너뛰고 바로 계획 생성 |
-| Consensus | `--consensus` 또는 `ralplan` | Planner-Architect-Critic 반복 합의 |
-| Review | `--review` | 기존 계획에 대한 Critic 평가 |
+| Mode | Trigger | Behavior |
+|------|---------|----------|
+| Interview | Broad request (default) | Interactive requirements gathering |
+| Direct | `--direct` or detailed request | Skip interview and generate plan immediately |
+| Consensus | `--consensus` or `ralplan` | Iterative Planner-Architect-Critic consensus |
+| Review | `--review` | Critic evaluation of an existing plan |
 
-## Interview 모드
+## Interview Mode
 
-광범위하거나 모호한 요청에 대해 인터랙티브로 요구사항을 수집합니다.
+Interactively gathers requirements for broad or vague requests.
 
-- 코드베이스 사실은 explore 에이전트로 먼저 파악합니다
-- 사용자에게는 한 번에 하나의 질문만 합니다
-- 각 질문은 이전 답변을 기반으로 합니다
-- 사용자가 준비되면 계획을 생성합니다
+- Codebase facts are gathered first via the explore agent
+- Only one question is asked at a time
+- Each question builds on previous answers
+- Generates a plan when the user is ready
 
-## Consensus 모드
+## Consensus Mode
 
-RALPLAN-DR 구조적 숙의를 쓰는 합의 모드입니다.
+A consensus mode using RALPLAN-DR structured deliberation.
 
-1. **Planner**가 초기 계획과 RALPLAN-DR 요약 작성
-2. **Architect**가 아키텍처 건전성 검토 (순차 실행)
-3. **Critic**이 품질 기준 평가 (Architect 완료 후 실행)
-4. 거부 시 최대 5회 반복 수정
-5. 승인 시 ADR 포함한 최종 계획 출력
+1. **Planner** writes the initial plan and RALPLAN-DR summary
+2. **Architect** reviews architectural soundness (runs sequentially)
+3. **Critic** evaluates quality criteria (runs after Architect completes)
+4. Iterates up to 5 times on rejection
+5. Outputs final plan with ADR on approval
 
-### RALPLAN-DR 요약 구성
+### RALPLAN-DR Summary Structure
 
-- 원칙 (3-5개)
-- 의사결정 동인 (상위 3개)
-- 실행 가능한 옵션 (2개 이상), 각각의 장단점
-- `--deliberate` 모드: 사전 사망 분석 (3개 시나리오) + 확장 테스트 계획
+- Principles (3-5)
+- Decision drivers (top 3)
+- Actionable options (2 or more), each with pros and cons
+- `--deliberate` mode: pre-mortem analysis (3 scenarios) + extended test plan
 
-## 옵션/플래그
+## Options / Flags
 
-| 플래그 | 설명 |
-|--------|------|
-| `--direct` | 인터뷰 없이 직접 계획 생성 |
-| `--consensus` | 합의 모드 활성화 |
-| `--review` | 기존 계획 리뷰 |
-| `--interactive` | 합의 모드에서 사용자 프롬프트 활성화 |
-| `--deliberate` | 고위험 작업용 심층 숙의 모드 |
-| `--architect codex` | Architect 단계에서 Codex 사용 |
-| `--critic codex` | Critic 단계에서 Codex 사용 |
+| Flag | Description |
+|------|-------------|
+| `--direct` | Generate plan directly without interview |
+| `--consensus` | Activate consensus mode |
+| `--review` | Review an existing plan |
+| `--interactive` | Enable user prompts during consensus mode |
+| `--deliberate` | Deep deliberation mode for high-risk work |
+| `--architect codex` | Use Codex in the Architect stage |
+| `--critic codex` | Use Codex in the Critic stage |
 
-## 계획 출력 형식
+## Plan Output Format
 
-모든 계획에 포함되는 항목:
+Every plan includes:
 
-- 요구사항 요약
-- 수락 기준 (테스트 가능한)
-- 구현 단계 (파일 참조 포함)
-- 리스크와 완화 방안
-- 검증 단계
-- Consensus 모드: RALPLAN-DR 요약 + ADR
+- Requirements summary
+- Acceptance criteria (testable)
+- Implementation steps (with file references)
+- Risks and mitigations
+- Verification steps
+- Consensus mode: RALPLAN-DR summary + ADR
 
-계획은 `.omc/plans/`에 저장됩니다.
+Plans are saved to `.omc/plans/`.
 
-## 관련 스킬
+## Related Skills
 
-- [ralplan](/docs/skills/workflow/ralplan) - `plan --consensus`의 단축 별칭
-- [autopilot](/docs/skills/workflow/autopilot) - 계획 후 자율 실행
-- [ralph](/docs/skills/workflow/ralph) - 계획 후 지속 루프 실행
-- [deep-interview](/docs/skills/workflow/deep-interview) - 계획 전 심층 인터뷰
+- [ralplan](/docs/skills/workflow/ralplan) - shortcut alias for `plan --consensus`
+- [autopilot](/docs/skills/workflow/autopilot) - autonomous execution after planning
+- [ralph](/docs/skills/workflow/ralph) - continuous loop execution after planning
+- [deep-interview](/docs/skills/workflow/deep-interview) - deep interview before planning
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
-|------|-----|
-| 호출 | `/oh-my-claudecode:omc-plan` |
-| 매직 키워드 | `plan this`, `plan the`, `let's plan` |
-| 카테고리 | Workflow |
-| 출력 경로 | `.omc/plans/` |
+| Item | Value |
+|------|-------|
+| Invoke | `/oh-my-claudecode:omc-plan` |
+| Magic Keywords | `plan this`, `plan the`, `let's plan` |
+| Category | Workflow |
+| Output Path | `.omc/plans/` |

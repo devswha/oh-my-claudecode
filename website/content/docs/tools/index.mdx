@@ -1,76 +1,76 @@
 ---
 title: Tools
-description: OMC가 제공하는 MCP 도구들을 카테고리별로 소개합니다.
+description: Introduces MCP tools provided by OMC, organized by category.
 ---
 
-## MCP 도구란?
+## What are MCP Tools?
 
-OMC는 Claude Code 에이전트에게 MCP(Model Context Protocol) 도구를 줍니다. 에이전트가 상태 관리, 메모 저장, 코드 분석, 데이터 처리에 씁니다.
+OMC provides MCP (Model Context Protocol) tools to Claude Code agents. Agents use them for state management, note storage, code analysis, and data processing.
 
-사용자가 직접 호출하는 [스킬](/docs/skills)과 달리, 도구는 에이전트가 작업 중에 내부적으로 사용합니다.
+Unlike [skills](/docs/skills) that users invoke directly, tools are used internally by agents during their work.
 
-## 도구 카테고리
+## Tool Categories
 
-### [State](/docs/tools/state)
+### State
 
-실행 모드의 상태를 관리하는 도구들입니다.
+Tools for managing execution mode state.
 
 `state_read`, `state_write`, `state_clear`, `state_list_active`, `state_get_status`
 
-Autopilot, Ralph, Ultrawork 등의 실행 모드가 현재 상태를 저장하고 읽는 데 사용합니다.
+Used by execution modes like Autopilot, Ralph, and Ultrawork to save and read their current state.
 
-### [Notepad](/docs/tools/notepad)
+### Notepad
 
-컨텍스트 컴팩션에서 살아남는 메모 시스템입니다.
+A note system that survives context compaction.
 
 `notepad_read`, `notepad_write_priority`, `notepad_write_working`, `notepad_write_manual`, `notepad_prune`, `notepad_stats`
 
-긴 세션에서 중요한 정보가 컨텍스트 윈도우에서 밀려나도 유지됩니다.
+Important information is preserved even when pushed out of the context window during long sessions.
 
-### [Project Memory](/docs/tools/project-memory)
+### Project Memory
 
-프로젝트별 장기 메모리를 관리합니다.
+Manages per-project long-term memory.
 
 `project_memory_read`, `project_memory_write`, `project_memory_add_note`, `project_memory_add_directive`
 
-프로젝트 구조, 규칙, 학습 내용을 세션 간에 유지합니다.
+Maintains project structure, rules, and learned knowledge across sessions.
 
-### [LSP](/docs/tools/lsp)
+### LSP
 
-Language Server Protocol을 통한 코드 인텔리전스 도구입니다.
+Code intelligence tools via Language Server Protocol.
 
-`lsp_hover`, `lsp_goto_definition`, `lsp_find_references`, `lsp_diagnostics`, `lsp_rename` 등 12개 도구
+`lsp_hover`, `lsp_goto_definition`, `lsp_find_references`, `lsp_diagnostics`, `lsp_rename` and 12 other tools
 
-타입 정보, 정의 이동, 참조 찾기, 에러 진단, 심볼 검색 등을 할 수 있습니다.
+Enables type information, go-to-definition, find references, error diagnostics, symbol search, and more.
 
-### [AST Grep](/docs/tools/ast-grep)
+### AST Grep
 
-AST 기반 구조적 코드 검색 및 치환 도구입니다.
+AST-based structural code search and replacement tools.
 
 `ast_grep_search`, `ast_grep_replace`
 
-정규식이 아닌 코드 구조 패턴으로 검색하고 치환합니다.
+Search and replace using code structure patterns rather than regular expressions.
 
-### [Python REPL](/docs/tools/python-repl)
+### Python REPL
 
-지속적 Python REPL로 데이터 분석을 수행합니다.
+Performs data analysis with a persistent Python REPL.
 
 `python_repl`
 
-세션 간 상태가 유지되는 Python 환경입니다.
+A Python environment with state preserved across sessions.
 
 ### Session Search
 
-이전 로컬 세션 기록과 트랜스크립트 아티팩트를 검색합니다.
+Searches previous local session history and transcript artifacts.
 
 `session_search`
 
-세션 ID, 타임스탬프, 소스 경로, 매칭 발췌문을 구조화된 JSON으로 반환합니다.
+Returns session IDs, timestamps, source paths, and matching excerpts as structured JSON.
 
 ### Trace
 
-에이전트 플로우 트레이스 데이터를 분석합니다.
+Analyzes agent flow trace data.
 
 `trace_timeline`, `trace_summary`
 
-`trace_timeline`은 훅, 키워드, 스킬, 에이전트, 도구를 시간 순으로 표시합니다. `trace_summary`는 훅 통계, 키워드 빈도, 스킬 활성화, 모드 전환, 도구 병목을 집계합니다.
+`trace_timeline` displays hooks, keywords, skills, agents, and tools in chronological order. `trace_summary` aggregates hook statistics, keyword frequency, skill activations, mode transitions, and tool bottlenecks.

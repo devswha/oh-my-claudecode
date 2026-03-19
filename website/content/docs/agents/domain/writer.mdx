@@ -1,63 +1,63 @@
 ---
 title: Writer
-description: README, API 문서, 기술 문서를 작성하는 경량 문서 에이전트.
+description: A lightweight documentation agent that writes READMEs, API docs, and technical documentation.
 ---
 
-## 개요
+## Overview
 
-Writer는 개발자가 읽고 싶어하는 명확하고 정확한 기술 문서를 만드는 에이전트입니다.
-README, API 문서, 아키텍처 문서, 사용자 가이드, 코드 주석을 맡습니다.
+Writer is an agent that creates clear, accurate technical documentation that developers want to read.
+It handles READMEs, API docs, architecture docs, user guides, and code comments.
 
-기본 모델이 haiku여서 빠르고 저렴하게 돌아갑니다.
+Its default model is haiku, making it fast and cheap to run.
 
-핵심 원칙은 정확성입니다.
-부정확한 문서는 문서가 없는 것보다 나쁩니다 -- 개발자를 잘못된 방향으로 이끕니다.
-모든 코드 예제는 테스트되어야 하고, 모든 명령어는 검증되어야 합니다.
+The core principle is accuracy.
+Inaccurate documentation is worse than no documentation — it leads developers in the wrong direction.
+All code examples must be tested and all commands must be verified.
 
-## 언제 쓰는가
+## When to Use
 
-- README나 프로젝트 문서를 작성할 때
-- API 문서를 만들 때
-- 마이그레이션 노트나 변경 로그를 작성할 때
-- 코드 주석을 추가할 때
+- When writing a README or project documentation
+- When creating API documentation
+- When writing migration notes or changelogs
+- When adding code comments
 
-## 사용 예시
+## Usage Examples
 
 ```
-"이 프로젝트의 README를 작성해줘"
-"auth API 엔드포인트를 문서화해줘"
-"이 모듈에 JSDoc 주석을 추가해줘"
+"Write a README for this project"
+"Document the auth API endpoints"
+"Add JSDoc comments to this module"
 ```
 
-## 작성 프로세스
+## Writing Process
 
-1. **요청 분석**: 정확한 문서화 작업을 식별합니다
-2. **코드베이스 탐색**: 문서화할 대상 코드를 Glob/Grep/Read로 파악합니다 (병렬 실행)
-3. **기존 문서 스타일 확인**: 문서의 구조, 스타일, 관습을 파악합니다
-4. **검증된 코드 예제로 문서 작성**: 모든 예제와 명령어를 테스트합니다
-5. **결과 보고**: 검증 결과를 포함합니다
+1. **Request Analysis**: Identify the exact documentation task
+2. **Codebase Exploration**: Understand the code to be documented using Glob/Grep/Read (run in parallel)
+3. **Check Existing Doc Style**: Understand the structure, style, and conventions of existing documentation
+4. **Write Documentation with Verified Code Examples**: Test all examples and commands
+5. **Report Results**: Include verification results
 
-## 작성 원칙
+## Writing Principles
 
-- **능동태, 직접적 언어, 불필요한 단어 없음**
-- **스캔 가능한 구조**: 헤더, 코드 블록, 테이블, 글머리 기호 사용
-- **정확한 범위**: 요청된 것만 문서화, scope creep 방지
-- **검증**: 코드 예제와 명령어를 테스트 후 포함합니다. 테스트할 수 없으면 명시합니다
+- **Active voice, direct language, no unnecessary words**
+- **Scannable structure**: Use headers, code blocks, tables, and bullet points
+- **Accurate scope**: Document only what was requested, prevent scope creep
+- **Verification**: Test code examples and commands before including them. If unable to test, state so explicitly
 
-Writer는 작성 패스만 수행합니다.
-같은 컨텍스트에서 자체 리뷰나 승인은 하지 않으며,
-리뷰가 필요하면 별도의 리뷰어/검증자 패스로 넘깁니다.
+Writer performs the writing pass only.
+It does not self-review or self-approve in the same context.
+When review is needed, it passes to a separate reviewer/verifier pass.
 
-## 다른 에이전트와의 조합
+## Combining with Other Agents
 
-- **explore**: 문서화 대상 코드의 위치와 구조 파악에 활용합니다
-- **executor**: 코드 변경과 함께 문서 업데이트가 필요할 때 executor와 병행합니다
-- **document-specialist**: 외부 API/SDK 문서 조회는 document-specialist 몫입니다
+- **explore**: Used to locate and understand the structure of code to be documented
+- **executor**: Run in parallel with executor when documentation updates are needed alongside code changes
+- **document-specialist**: External API/SDK documentation lookups are handled by document-specialist
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
+| Item | Value |
 |------|-----|
-| 모델 | haiku |
-| 서브에이전트 타입 | `oh-my-claudecode:writer` |
-| 레인 | Domain |
+| Model | haiku |
+| Subagent Type | `oh-my-claudecode:writer` |
+| Lane | Domain |

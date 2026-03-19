@@ -1,120 +1,120 @@
 ---
-title: 에이전트 카탈로그
-description: OMC의 19개 전문 에이전트를 4개 레인으로 분류한 전체 목록.
+title: Agent Catalog
+description: A complete list of OMC's 19 specialized agents organized into 4 lanes.
 ---
 
-## 에이전트 시스템
+## Agent System
 
-oh-my-claudecode에는 19개의 전문 에이전트가 있습니다.
-각 에이전트는 역할이 정해져 있고, `oh-my-claudecode:에이전트이름` 형식으로 호출합니다.
+oh-my-claudecode has 19 specialized agents.
+Each agent has a defined role and is invoked using the format `oh-my-claudecode:agent-name`.
 
-오케스트레이터가 작업 성격에 따라 자동으로 적절한 에이전트에 위임하고,
-사용자가 직접 지정할 수도 있습니다.
+The orchestrator automatically delegates to the appropriate agent based on the nature of the task,
+and users can also specify an agent directly.
 
-## 4개 레인 구조
+## 4-Lane Structure
 
-에이전트들은 역할에 따라 4개 레인으로 나뉩니다.
+Agents are divided into 4 lanes based on their roles.
 
 ### Build & Analysis
 
-코드 탐색부터 구현, 검증까지 개발 흐름 전반을 다룹니다.
+Covers the full development flow from codebase exploration to implementation and verification.
 
-| 에이전트 | 기본 모델 | 역할 |
+| Agent | Default Model | Role |
 |----------|-----------|------|
-| [`explore`](/docs/agents/build-analysis/explore) | haiku | 코드베이스 탐색, 파일/심볼 검색 |
-| [`analyst`](/docs/agents/build-analysis/analyst) | opus | 요구사항 분석, 수락 기준 정의 |
-| [`planner`](/docs/agents/build-analysis/planner) | opus | 작업 순서 결정, 실행 계획 수립 |
-| [`architect`](/docs/agents/build-analysis/architect) | opus | 시스템 설계, 경계, 인터페이스 정의 |
-| [`debugger`](/docs/agents/build-analysis/debugger) | sonnet | 근본 원인 분석, 빌드 에러 수정 |
-| [`executor`](/docs/agents/build-analysis/executor) | sonnet | 코드 구현, 리팩토링 |
-| [`verifier`](/docs/agents/build-analysis/verifier) | sonnet | 완료 증거 수집, 주장 검증 |
-| [`tracer`](/docs/agents/build-analysis/tracer) | sonnet | 증거 기반 인과 추적, 가설 경쟁 |
+| [`explore`](/docs/agents/build-analysis/explore) | haiku | Codebase exploration, file/symbol search |
+| [`analyst`](/docs/agents/build-analysis/analyst) | opus | Requirements analysis, acceptance criteria definition |
+| [`planner`](/docs/agents/build-analysis/planner) | opus | Task sequencing, execution plan creation |
+| [`architect`](/docs/agents/build-analysis/architect) | opus | System design, boundaries, interface definition |
+| [`debugger`](/docs/agents/build-analysis/debugger) | sonnet | Root cause analysis, build error resolution |
+| [`executor`](/docs/agents/build-analysis/executor) | sonnet | Code implementation, refactoring |
+| [`verifier`](/docs/agents/build-analysis/verifier) | sonnet | Completion evidence collection, claim validation |
+| [`tracer`](/docs/agents/build-analysis/tracer) | sonnet | Evidence-based causal tracing, competing hypotheses |
 
 ### Review
 
-코드 품질과 보안을 검토합니다.
+Reviews code quality and security.
 
-| 에이전트 | 기본 모델 | 역할 |
+| Agent | Default Model | Role |
 |----------|-----------|------|
-| [`security-reviewer`](/docs/agents/review/security-reviewer) | opus | OWASP Top 10, 인증/인가 취약점 검토 |
-| [`code-reviewer`](/docs/agents/review/code-reviewer) | opus | 로직 결함, API 계약, 하위 호환성 검토 |
+| [`security-reviewer`](/docs/agents/review/security-reviewer) | opus | OWASP Top 10, authentication/authorization vulnerability review |
+| [`code-reviewer`](/docs/agents/review/code-reviewer) | opus | Logic defects, API contracts, backward compatibility review |
 
 ### Domain
 
-분야별 전문 작업을 맡습니다.
+Handles domain-specific specialized tasks.
 
-| 에이전트 | 기본 모델 | 역할 |
+| Agent | Default Model | Role |
 |----------|-----------|------|
-| [`test-engineer`](/docs/agents/domain/test-engineer) | sonnet | 테스트 전략, 커버리지, TDD |
-| [`designer`](/docs/agents/domain/designer) | sonnet | UI/UX 아키텍처, 인터랙션 설계 |
-| [`writer`](/docs/agents/domain/writer) | haiku | 기술 문서, README, API 문서 |
-| [`qa-tester`](/docs/agents/domain/qa-tester) | sonnet | tmux를 통한 CLI/서비스 런타임 검증 |
-| [`scientist`](/docs/agents/domain/scientist) | sonnet | 데이터/통계 분석, 연구 실행 |
-| [`git-master`](/docs/agents/domain/git-master) | sonnet | 원자적 커밋, 리베이스, 히스토리 관리 |
-| [`document-specialist`](/docs/agents/domain/document-specialist) | sonnet | 외부 문서/레퍼런스 조회 |
-| [`code-simplifier`](/docs/agents/domain/code-simplifier) | opus | 코드 명확성, 일관성 개선 |
+| [`test-engineer`](/docs/agents/domain/test-engineer) | sonnet | Test strategy, coverage, TDD |
+| [`designer`](/docs/agents/domain/designer) | sonnet | UI/UX architecture, interaction design |
+| [`writer`](/docs/agents/domain/writer) | haiku | Technical docs, README, API documentation |
+| [`qa-tester`](/docs/agents/domain/qa-tester) | sonnet | CLI/service runtime validation via tmux |
+| [`scientist`](/docs/agents/domain/scientist) | sonnet | Data/statistical analysis, research execution |
+| [`git-master`](/docs/agents/domain/git-master) | sonnet | Atomic commits, rebase, history management |
+| [`document-specialist`](/docs/agents/domain/document-specialist) | sonnet | External documentation/reference lookup |
+| [`code-simplifier`](/docs/agents/domain/code-simplifier) | opus | Code clarity and consistency improvement |
 
 ### Coordination
 
-계획과 설계에 비판적 검토를 겁니다.
+Applies critical review to plans and designs.
 
-| 에이전트 | 기본 모델 | 역할 |
+| Agent | Default Model | Role |
 |----------|-----------|------|
-| [`critic`](/docs/agents/coordination/critic) | opus | 계획/설계 비판적 검토, 다각도 분석 |
+| [`critic`](/docs/agents/coordination/critic) | opus | Critical review of plans/designs, multi-perspective analysis |
 
-## 모델 티어
+## Model Tiers
 
-각 에이전트에는 기본 모델 티어가 지정되어 있지만, 호출 시 `model` 파라미터로 바꿀 수 있습니다.
+Each agent has a default model tier assigned, but it can be changed at call time using the `model` parameter.
 
-| 티어 | 모델 | 특성 | 대표 에이전트 |
+| Tier | Model | Characteristics | Representative Agents |
 |------|------|------|--------------|
-| LOW | haiku | 빠르고 저렴. 단순 조회에 적합 | explore, writer |
-| MEDIUM | sonnet | 균형 잡힌 성능. 구현/디버깅에 적합 | executor, debugger, test-engineer |
-| HIGH | opus | 최고 수준 추론. 설계/분석에 적합 | architect, planner, critic, code-reviewer |
+| LOW | haiku | Fast and cheap. Suitable for simple lookups | explore, writer |
+| MEDIUM | sonnet | Balanced performance. Suitable for implementation/debugging | executor, debugger, test-engineer |
+| HIGH | opus | Top-level reasoning. Suitable for design/analysis | architect, planner, critic, code-reviewer |
 
-일부 에이전트는 티어별 변형(variant)을 지원합니다.
-예를 들어 `explore`는 기본 haiku지만, `explore-high`로 opus 티어를 쓸 수 있습니다.
+Some agents support tier variants.
+For example, `explore` defaults to haiku, but `explore-high` uses the opus tier.
 
-## 에이전트 선택 가이드
+## Agent Selection Guide
 
-| 작업 유형 | 추천 에이전트 | 모델 |
+| Task Type | Recommended Agent | Model |
 |-----------|-------------|------|
-| 빠른 코드 조회 | `explore` | haiku |
-| 파일/패턴 찾기 | `explore` | haiku |
-| 기능 구현 | `executor` | sonnet |
-| 복잡한 리팩토링 | `executor` (model=opus) | opus |
-| 단순 버그 수정 | `debugger` | sonnet |
-| 복잡한 디버깅 | `architect` | opus |
-| UI 컴포넌트 | `designer` | sonnet |
-| 문서 작성 | `writer` | haiku |
-| SDK/API 문서 조회 | `document-specialist` | sonnet |
-| 테스트 전략 | `test-engineer` | sonnet |
-| 보안 리뷰 | `security-reviewer` | opus |
-| 코드 리뷰 | `code-reviewer` | opus |
-| 데이터 분석 | `scientist` | sonnet |
-| 전략 계획 | `planner` | opus |
-| 계획 검토 | `critic` | opus |
+| Quick code lookup | `explore` | haiku |
+| Find files/patterns | `explore` | haiku |
+| Feature implementation | `executor` | sonnet |
+| Complex refactoring | `executor` (model=opus) | opus |
+| Simple bug fix | `debugger` | sonnet |
+| Complex debugging | `architect` | opus |
+| UI components | `designer` | sonnet |
+| Write documentation | `writer` | haiku |
+| SDK/API doc lookup | `document-specialist` | sonnet |
+| Test strategy | `test-engineer` | sonnet |
+| Security review | `security-reviewer` | opus |
+| Code review | `code-reviewer` | opus |
+| Data analysis | `scientist` | sonnet |
+| Strategic planning | `planner` | opus |
+| Plan review | `critic` | opus |
 
-## 에이전트 워크플로우
+## Agent Workflow
 
-일반적인 작업에서 에이전트들은 아래 순서로 협력합니다.
+In a typical task, agents collaborate in the following order.
 
 ```
-explore (탐색)
-  → analyst (요구사항 분석)
-    → planner (계획 수립)
-      → critic (계획 검토)
-        → executor (구현)
-          → verifier (검증)
+explore (discovery)
+  → analyst (requirements analysis)
+    → planner (plan creation)
+      → critic (plan review)
+        → executor (implementation)
+          → verifier (verification)
 ```
 
-각 에이전트의 상세 설명은 해당 레인의 하위 페이지에서 볼 수 있습니다.
+Detailed descriptions of each agent are available on the sub-pages within each lane.
 
-## Deprecated 에이전트 별칭
+## Deprecated Agent Aliases
 
-이전 버전 호환을 위해 아래 별칭이 남아 있습니다.
+The following aliases remain for backward compatibility.
 
-| 별칭 | 실제 에이전트 |
+| Alias | Actual Agent |
 |------|-------------|
 | `api-reviewer` | code-reviewer |
 | `performance-reviewer` | code-reviewer |

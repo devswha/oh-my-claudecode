@@ -1,63 +1,63 @@
 ---
 title: Document Specialist
-description: 외부 문서, API 레퍼런스, SDK 문서를 조회하고 합성하는 에이전트.
+description: An agent that looks up and synthesizes external documentation, API references, and SDK docs.
 ---
 
-## 개요
+## Overview
 
-Document Specialist는 가장 신뢰할 수 있는 문서 소스에서 정보를 찾아 합성하는 에이전트입니다.
-로컬 리포 문서, 큐레이팅된 문서 백엔드(Context Hub/Context7), 공식 외부 문서 순으로 탐색합니다.
+Document Specialist is an agent that finds and synthesizes information from the most trustworthy documentation sources.
+It searches in order: local repo docs, curated documentation backends (Context Hub/Context7), official external docs.
 
-프로젝트 문서 조회, 외부 문서 조회, API/프레임워크 레퍼런스 연구,
-패키지 평가, 버전 호환성 확인, 학술 논문/문헌/레퍼런스 데이터베이스 조사도 합니다.
+It also handles project documentation lookup, external documentation lookup, API/framework reference research,
+package evaluation, version compatibility verification, and academic paper/literature/reference database research.
 
-오래되거나 잘못된 API 문서를 기반으로 구현하면 진단하기 어려운 버그가 생깁니다.
+Implementing based on outdated or incorrect API documentation creates bugs that are difficult to diagnose.
 
-읽기 전용(read-only) 에이전트입니다.
+It is a read-only agent.
 
-## 언제 쓰는가
+## When to Use
 
-- SDK나 프레임워크의 올바른 사용법을 확인할 때
-- 외부 API의 파라미터와 동작을 조사할 때
-- 패키지 버전 호환성을 확인할 때
-- 학술 논문이나 표준 문서를 조사할 때
+- When verifying the correct usage of an SDK or framework
+- When researching parameters and behavior of an external API
+- When checking package version compatibility
+- When researching academic papers or standard documents
 
-## 사용 예시
+## Usage Examples
 
 ```
-"Node.js에서 fetch의 timeout 구현 방법을 찾아줘"
-"이 라이브러리의 최신 API 변경사항을 확인해줘"
-"OpenAI SDK의 스트리밍 응답 처리 방법을 조사해줘"
+"Find how to implement fetch timeout in Node.js"
+"Check the latest API changes for this library"
+"Research how to handle streaming responses in the OpenAI SDK"
 ```
 
-## 조회 우선순위
+## Lookup Priority
 
-1. **로컬 리포 문서**: README, `docs/`, 마이그레이션 가이드 -- 프로젝트 관련 질문일 때 먼저 확인합니다
-2. **Context Hub / 큐레이팅된 백엔드**: `chub` 또는 Context7 MCP 도구로 공식 SDK/API 문서를 조회합니다
-3. **공식 외부 문서**: WebSearch/WebFetch로 공식 문서를 검색합니다 -- `chub`이 없거나 커버리지가 부족할 때
-4. **보조 소스**: 블로그, Stack Overflow -- 공식 문서가 없을 때만 사용합니다
+1. **Local Repo Docs**: README, `docs/`, migration guides — check first for project-related questions
+2. **Context Hub / Curated Backend**: Look up official SDK/API docs using `chub` or Context7 MCP tools
+3. **Official External Docs**: Search official docs with WebSearch/WebFetch — when `chub` is unavailable or coverage is insufficient
+4. **Secondary Sources**: Blogs, Stack Overflow — only when official docs are unavailable
 
-## 출력 기준
+## Output Standards
 
-모든 답변에는 검증 가능한 출처가 포함됩니다.
-- 가능하면 소스 URL을 제공합니다
-- URL이 없는 큐레이팅된 백엔드 응답은 라이브러리/문서 ID를 명시합니다
-- 2년 이상 된 정보나 deprecated 문서는 명시적으로 플래그합니다
-- 버전 호환성 이슈를 명시적으로 표시합니다
-- 해당되는 경우 코드 예제를 포함합니다
+All answers include verifiable sources.
+- Provide source URLs when possible
+- For curated backend responses without URLs, specify the library/doc ID
+- Explicitly flag information older than 2 years or from deprecated docs
+- Explicitly note version compatibility issues
+- Include code examples where applicable
 
-## 다른 에이전트와의 조합
+## Combining with Other Agents
 
-- **explore**: 내부 코드베이스 탐색은 explore 몫입니다. 외부 문서 조회는 document-specialist가 맡습니다
-- **executor**: 올바른 API 사용법을 확인한 후 executor가 구현합니다
-- **planner**: 외부 API/SDK에 의존하는 계획을 세울 때 document-specialist에 자문합니다
+- **explore**: Internal codebase exploration is explore's responsibility. External documentation lookup is handled by document-specialist
+- **executor**: After confirming correct API usage, executor implements
+- **planner**: Consults document-specialist when creating plans that depend on external APIs/SDKs
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
+| Item | Value |
 |------|-----|
-| 모델 | sonnet |
-| 서브에이전트 타입 | `oh-my-claudecode:document-specialist` |
-| 레인 | Domain |
-| 읽기 전용 | Yes (Write, Edit 차단) |
-| 이전 이름 | `dependency-expert`, `researcher` (모두 deprecated) |
+| Model | sonnet |
+| Subagent Type | `oh-my-claudecode:document-specialist` |
+| Lane | Domain |
+| Read-Only | Yes (Write, Edit blocked) |
+| Former Names | `dependency-expert`, `researcher` (both deprecated) |

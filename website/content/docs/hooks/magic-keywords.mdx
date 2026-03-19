@@ -1,87 +1,87 @@
 ---
-title: 매직 키워드
-description: 자연어 프롬프트로 OMC의 실행 모드와 스킬을 활성화하는 매직 키워드 시스템입니다.
+title: Magic Keywords
+description: The magic keyword system that activates OMC execution modes and skills through natural language prompts.
 ---
 
-## 매직 키워드란?
+## What are Magic Keywords?
 
-매직 키워드는 사용자의 자연어 프롬프트에서 특정 단어나 패턴을 감지하여
-자동으로 OMC의 스킬이나 실행 모드를 활성화하는 시스템입니다.
+Magic keywords are a system that detects specific words or patterns in a user's natural language prompt
+and automatically activates OMC skills or execution modes.
 
-별도의 슬래시 커맨드 없이, 프롬프트에 키워드를 포함하면 해당 기능이 자동으로 활성화됩니다.
+Without a separate slash command, including a keyword in your prompt automatically activates the corresponding feature.
 
-## keyword-detector 동작 방식
+## How keyword-detector Works
 
-`keyword-detector.mjs`는 UserPromptSubmit 이벤트에서 실행됩니다.
+`keyword-detector.mjs` runs on the UserPromptSubmit event.
 
-1. 사용자 프롬프트를 받아 정제(sanitize) 처리
-2. 코드 블록, XML 태그, URL, 파일 경로를 제거하여 오탐 방지
-3. 정제된 텍스트에서 키워드 패턴 매칭
-4. 충돌 해결 후 해당 스킬 호출 지시를 주입
+1. Receives the user prompt and sanitizes it
+2. Removes code blocks, XML tags, URLs, and file paths to prevent false positives
+3. Performs keyword pattern matching on the sanitized text
+4. Injects the skill invocation instruction after conflict resolution
 
-### 안전 장치
+### Safety Guards
 
-- **정제 처리**: 코드 블록 안의 키워드, URL 내 단어, 파일 경로는 무시
-- **팀 워커 보호**: `OMC_TEAM_WORKER` 환경 변수가 설정되면 비활성화 (무한 스폰 방지)
-- **비활성화**: `DISABLE_OMC=1` 또는 `OMC_SKIP_HOOKS=keyword-detector`
+- **Sanitization**: Keywords inside code blocks, words in URLs, and file paths are ignored
+- **Team worker protection**: Disabled when the `OMC_TEAM_WORKER` environment variable is set (prevents infinite spawning)
+- **Disable**: `DISABLE_OMC=1` or `OMC_SKIP_HOOKS=keyword-detector`
 
-## 키워드 목록
+## Keyword List
 
-### 실행 모드 키워드
+### Execution Mode Keywords
 
-스킬을 호출하고 상태 파일을 생성하는 키워드입니다.
+Keywords that invoke a skill and create a state file.
 
-| 키워드 | 스킬 | 설명 |
+| Keyword | Skill | Description |
 |--------|------|------|
-| `cancelomc`, `stopomc` | cancel | 모든 활성 모드 취소 |
-| `ralph`, `don't stop`, `must complete`, `until done` | ralph | 검증 완료까지 지속 실행 |
-| `autopilot`, `auto pilot`, `autonomous`, `build me`, `I want a`, `handle it all`, `end to end`, `e2e this` | autopilot | 완전 자율 실행 |
-| `ultrawork`, `ulw`, `uw` | ultrawork | 최대 병렬 실행 |
-| `ccg`, `claude-codex-gemini` | ccg | Claude-Codex-Gemini 삼중 모델 오케스트레이션 |
-| `ralplan` | ralplan | 합의 기반 반복 계획 |
-| `deep interview`, `ouroboros` | deep-interview | 소크라테스식 심층 인터뷰 |
+| `cancelomc`, `stopomc` | cancel | Cancels all active modes |
+| `ralph`, `don't stop`, `must complete`, `until done` | ralph | Persistent execution until verification complete |
+| `autopilot`, `auto pilot`, `autonomous`, `build me`, `I want a`, `handle it all`, `end to end`, `e2e this` | autopilot | Fully autonomous execution |
+| `ultrawork`, `ulw`, `uw` | ultrawork | Maximum parallel execution |
+| `ccg`, `claude-codex-gemini` | ccg | Claude-Codex-Gemini tri-model orchestration |
+| `ralplan` | ralplan | Consensus-based iterative planning |
+| `deep interview`, `ouroboros` | deep-interview | Socratic deep interview |
 
-### AI Slop 정리 키워드
+### AI Slop Cleanup Keywords
 
-명시적 패턴과 조합 패턴 두 가지를 지원합니다.
+Supports two types: explicit patterns and combination patterns.
 
-**명시적 패턴** (단독으로 활성화):
+**Explicit patterns** (activate on their own):
 - `ai-slop`, `anti-slop`, `deslop`, `de-slop`
 
-**조합 패턴** (액션 + 스멜 조합 시 활성화):
+**Combination patterns** (activate when action + smell are combined):
 
-| 액션 키워드 | 스멜 키워드 |
+| Action keywords | Smell keywords |
 |------------|------------|
 | `cleanup`, `refactor`, `simplify`, `dedupe`, `prune` | `slop`, `duplicate`, `dead code`, `unused code`, `over-abstraction`, `wrapper layers`, `needless abstractions`, `ai-generated`, `tech debt` |
 
-예: "cleanup the duplicate code" → ai-slop-cleaner 스킬 활성화
+Example: "cleanup the duplicate code" → activates the ai-slop-cleaner skill
 
-### 에이전트 바로가기 키워드
+### Agent Shortcut Keywords
 
-슬래시 커맨드 대신 자연어로 에이전트를 활성화합니다.
+Activates agents with natural language instead of slash commands.
 
-| 키워드 | 효과 | 동작 |
+| Keyword | Effect | Behavior |
 |--------|------|------|
-| `tdd`, `test first`, `red green` | TDD 모드 | 테스트 우선 작성 강제 |
-| `code review`, `review code` | 코드 리뷰 모드 | 종합 코드 리뷰 실행 |
-| `security review`, `review security` | 보안 리뷰 모드 | 보안 중심 리뷰 실행 |
+| `tdd`, `test first`, `red green` | TDD mode | Forces test-first writing |
+| `code review`, `review code` | Code review mode | Runs comprehensive code review |
+| `security review`, `review security` | Security review mode | Runs security-focused review |
 
-이 키워드들은 스킬을 호출하는 대신 인라인 모드 메시지를 주입합니다.
+These keywords inject an inline mode message instead of invoking a skill.
 
-### 추론 강화 키워드
+### Reasoning Enhancement Keywords
 
-| 키워드 | 효과 |
+| Keyword | Effect |
 |--------|------|
-| `ultrathink`, `think hard`, `think deeply` | 확장 추론 모드 활성화 |
-| `deepsearch`, `search the codebase`, `find in codebase` | 코드베이스 중심 검색 모드 |
-| `deep-analyze`, `deepanalyze` | 심층 분석 모드 |
+| `ultrathink`, `think hard`, `think deeply` | Activates extended reasoning mode |
+| `deepsearch`, `search the codebase`, `find in codebase` | Codebase-focused search mode |
+| `deep-analyze`, `deepanalyze` | Deep analysis mode |
 
-## 우선순위와 충돌 해결
+## Priority and Conflict Resolution
 
-여러 키워드가 동시에 감지되면 아래 우선순위로 해결됩니다.
+When multiple keywords are detected simultaneously, they are resolved in the following priority order:
 
 ```
-cancel (최우선, 단독 실행)
+cancel (highest priority, exclusive)
   → ralph
     → autopilot
       → ultrawork
@@ -97,38 +97,38 @@ cancel (최우선, 단독 실행)
                           → analyze
 ```
 
-`cancel`은 배타적입니다 -- 다른 모든 매칭을 무시하고 취소만 실행합니다.
-그 외 키워드는 복수 매칭이 가능하며, 우선순위 순으로 처리됩니다.
+`cancel` is exclusive -- it ignores all other matches and only runs the cancel.
+Other keywords allow multiple matches and are processed in priority order.
 
-## 사용 예시
+## Usage Examples
 
 ```bash
-# Claude Code에서:
+# In Claude Code:
 
-# 자율 실행
-autopilot: OAuth로 사용자 인증을 구현해줘
+# Autonomous execution
+autopilot: implement user authentication with OAuth
 
-# 병렬 실행
-ultrawork 이 모듈의 테스트를 모두 작성해줘
+# Parallel execution
+ultrawork write all tests for this module
 
-# 지속 실행
-ralph 이 인증 모듈을 리팩토링해줘
+# Persistent execution
+ralph refactor this authentication module
 
 # TDD
-tdd로 비밀번호 검증 함수를 구현해줘
+tdd: implement password validation function
 
-# 코드 리뷰
-최근 변경사항을 code review 해줘
+# Code review
+code review the recent changes
 
-# 취소
+# Cancel
 stopomc
 ```
 
-## Team 키워드
+## Team Keywords
 
-team은 자동 감지 대상이 아닙니다.
-무한 스폰 방지를 위해 `/team` 슬래시 커맨드로만 명시적으로 호출해야 합니다.
+`team` is not auto-detected.
+To prevent infinite spawning, it must be explicitly invoked with the `/team` slash command.
 
 ```
-/oh-my-claudecode:team 3:executor "풀스택 todo 앱을 만들어줘"
+/oh-my-claudecode:team 3:executor "build a full-stack todo app"
 ```

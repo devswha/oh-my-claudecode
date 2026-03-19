@@ -1,25 +1,25 @@
 ---
 title: MCP Setup
-description: Claude Code의 기능을 확장하는 MCP 서버를 설정하는 스킬
+description: A skill that configures MCP servers to extend Claude Code's capabilities
 ---
 
-## 개요
+## Overview
 
-MCP Setup은 Model Context Protocol(MCP) 서버를 설정하여 Claude Code 에이전트에게 웹 검색, 파일 시스템 접근, GitHub 통합 등 추가 도구를 제공하는 스킬입니다.
+MCP Setup is a skill that configures Model Context Protocol (MCP) servers to provide Claude Code agents with additional tools such as web search, file system access, and GitHub integration.
 
-`claude mcp add` 명령을 사용하여 설정합니다.
+Configuration is done using the `claude mcp add` command.
 
-## 사용법
+## Usage
 
 ```bash
 /oh-my-claudecode:mcp-setup
 ```
 
-## 지원 MCP 서버
+## Supported MCP Servers
 
 ### Context7
 
-라이브러리/프레임워크 공식 문서를 조회합니다. API 키 불필요.
+Retrieves official documentation for libraries and frameworks. No API key required.
 
 ```bash
 claude mcp add context7 -- npx -y @upstash/context7-mcp
@@ -27,7 +27,7 @@ claude mcp add context7 -- npx -y @upstash/context7-mcp
 
 ### Exa Web Search
 
-향상된 웹 검색 기능입니다.
+Enhanced web search capabilities.
 
 ```bash
 claude mcp add -e EXA_API_KEY=<key> exa -- npx -y exa-mcp-server
@@ -35,7 +35,7 @@ claude mcp add -e EXA_API_KEY=<key> exa -- npx -y exa-mcp-server
 
 ### Filesystem
 
-확장된 파일 시스템 접근 기능입니다.
+Extended file system access capabilities.
 
 ```bash
 claude mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem <dirs>
@@ -43,51 +43,51 @@ claude mcp add filesystem -- npx -y @modelcontextprotocol/server-filesystem <dir
 
 ### GitHub
 
-GitHub API 통합 (이슈, PR, 저장소 관리) 기능입니다.
+GitHub API integration (issues, PRs, repository management).
 
 ```bash
-# Docker (로컬)
+# Docker (local)
 claude mcp add -e GITHUB_PERSONAL_ACCESS_TOKEN=<token> github -- docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server
 
-# HTTP (리모트)
+# HTTP (remote)
 claude mcp add --transport http github https://api.githubcopilot.com/mcp/
 ```
 
-### 커스텀
+### Custom
 
-사용자 정의 MCP 서버를 추가합니다.
+Add a custom MCP server.
 
 ```bash
-# stdio 서버
+# stdio server
 claude mcp add <name> -- <command> [args...]
 
-# HTTP 서버
+# HTTP server
 claude mcp add --transport http <name> <url>
 ```
 
-## 설치 확인
+## Verify Installation
 
 ```bash
 claude mcp list
 ```
 
-## 문제 해결
+## Troubleshooting
 
-| 문제 | 해결 |
-|------|------|
-| MCP 서버 미로드 | Node.js 18+ 설치 확인 |
-| API 키 문제 | 해당 서비스 대시보드에서 키 확인 |
-| 빌트인 도구 사용 | Claude Code 재시작 |
+| Issue | Solution |
+|-------|----------|
+| MCP server not loading | Verify Node.js 18+ is installed |
+| API key issues | Check your key in the respective service dashboard |
+| Using built-in tools | Restart Claude Code |
 
-## 관련 스킬
+## Related Skills
 
-- [omc-setup](/docs/skills/utility/omc-setup) - 전체 OMC 설정 (MCP 포함)
-- [setup](/docs/skills/utility/setup) - 통합 설정 진입점
+- [omc-setup](/docs/skills/utility/omc-setup) - Full OMC configuration (includes MCP)
+- [setup](/docs/skills/utility/setup) - Unified setup entry point
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
-|------|-----|
-| 호출 | `/oh-my-claudecode:mcp-setup` |
-| 매직 키워드 | - |
-| 카테고리 | Utility |
+| Item | Value |
+|------|-------|
+| Invocation | `/oh-my-claudecode:mcp-setup` |
+| Magic Keyword | - |
+| Category | Utility |

@@ -1,65 +1,65 @@
 ---
 title: QA Tester
-description: tmux 세션으로 CLI/서비스의 런타임 동작을 대화형으로 검증하는 에이전트.
+description: An agent that interactively validates CLI/service runtime behavior through tmux sessions.
 ---
 
-## 개요
+## Overview
 
-QA Tester는 tmux 세션에서 애플리케이션의 실제 동작을 대화형으로 검증하는 에이전트입니다.
-서비스 시작, 명령 전송, 출력 캡처, 기대값 대비 검증, 정리(teardown)까지 합니다.
+QA Tester is an agent that interactively validates actual application behavior in tmux sessions.
+It handles starting services, sending commands, capturing output, validating against expectations, and teardown.
 
-유닛 테스트는 코드 로직을 검증하지만, QA 테스팅은 실제 동작을 검증합니다.
-애플리케이션이 모든 유닛 테스트를 통과하면서도 실제 실행 시 실패할 수 있습니다.
-tmux를 통한 대화형 테스팅은 시작 실패, 통합 이슈, 사용자 대면 버그를 잡아냅니다.
+Unit tests verify code logic, but QA testing verifies actual behavior.
+An application can pass all unit tests yet fail when actually run.
+Interactive testing via tmux catches startup failures, integration issues, and user-facing bugs.
 
-## 언제 쓰는가
+## When to Use
 
-- 자동화된 테스트 스위트가 해당 동작을 커버하지 않을 때
-- 대화형 CLI 입출력 시뮬레이션이 필요할 때
-- 서비스 시작/종료 테스팅이 필요할 때
-- 스트리밍/실시간 동작 검증이 필요할 때
+- When the automated test suite does not cover the behavior in question
+- When interactive CLI input/output simulation is needed
+- When service startup/shutdown testing is needed
+- When streaming/real-time behavior validation is needed
 
-### 쓰지 않을 때
+### When Not to Use
 
-- 프로젝트에 해당 기능을 커버하는 테스트가 있을 때 (테스트 실행이 더 효율적)
-- 단순 명령 검증 (직접 실행이 더 효율적)
-- 정적 코드 분석 (architect가 더 적합)
+- When the project has tests covering the feature (running tests is more efficient)
+- For simple command verification (direct execution is more efficient)
+- For static code analysis (architect is more suitable)
 
-## 사용 예시
+## Usage Examples
 
 ```
-"API 서버가 정상 응답하는지 실제로 테스트해줘"
-"이 CLI 도구의 대화형 기능을 검증해줘"
-"서비스 시작 후 /health 엔드포인트를 확인해줘"
+"Actually test that the API server responds correctly"
+"Validate the interactive features of this CLI tool"
+"Check the /health endpoint after service startup"
 ```
 
-## 테스트 프로세스
+## Testing Process
 
-1. **전제 조건 확인**: tmux 설치, 포트 가용, 디렉토리 존재를 확인합니다. 미충족 시 즉시 실패합니다
-2. **설정**: 고유 이름(`qa-{서비스}-{테스트}-{타임스탬프}`)으로 tmux 세션을 생성하고, 서비스를 시작하고, 준비 신호를 대기합니다
-3. **실행**: 테스트 명령을 전송하고, 출력을 대기하고, `tmux capture-pane`으로 캡처합니다
-4. **검증**: 캡처된 출력을 예상 패턴과 대조합니다. PASS/FAIL을 보고합니다
-5. **정리**: tmux 세션을 종료하고, 아티팩트를 제거합니다. 실패 시에도 반드시 정리합니다
+1. **Prerequisite Check**: Verify tmux is installed, port is available, directory exists. Fail immediately if not met
+2. **Setup**: Create a tmux session with a unique name (`qa-{service}-{test}-{timestamp}`), start the service, wait for ready signal
+3. **Execute**: Send test commands, wait for output, capture with `tmux capture-pane`
+4. **Validate**: Compare captured output against expected patterns. Report PASS/FAIL
+5. **Cleanup**: Terminate tmux session and remove artifacts. Always clean up, even on failure
 
-## 주요 규칙
+## Key Rules
 
-- **고유 세션 이름**: `qa-{서비스}-{테스트}-{타임스탬프}` 형식. "test" 같은 일반 이름 금지
-- **준비 상태 대기**: 서비스 시작 후 바로 명령 전송 금지. 출력 패턴이나 포트 가용성 폴링
-- **출력 먼저 캡처**: 어서션 전에 반드시 `tmux capture-pane` 실행
-- **항상 정리**: 테스트 실패 시에도 반드시 세션 종료. 고아 프로세스 방지
-- **적절한 딜레이**: send-keys와 capture-pane 사이에 짧은 딜레이 필요
+- **Unique session names**: Use the format `qa-{service}-{test}-{timestamp}`. No generic names like "test"
+- **Wait for readiness**: Do not send commands immediately after service startup. Poll for output pattern or port availability
+- **Capture output first**: Always run `tmux capture-pane` before making assertions
+- **Always clean up**: Always terminate the session even on test failure. Prevent orphan processes
+- **Appropriate delays**: Short delays are needed between send-keys and capture-pane
 
-## 다른 에이전트와의 조합
+## Combining with Other Agents
 
-- **architect**: Architect가 진단하고 테스트 계획을 출력하면 QA Tester가 실행합니다 (진단-검증 루프)
-- **debugger**: 테스트 실패의 원인 분석은 debugger 몫입니다
-- **verifier**: 자동화된 테스트 검증은 verifier에 맡깁니다
+- **architect**: Architect diagnoses and outputs a test plan; QA Tester executes it (diagnosis-validation loop)
+- **debugger**: Root cause analysis of test failures is debugger's responsibility
+- **verifier**: Automated test verification is handled by verifier
 
-## 레퍼런스
+## Reference
 
-| 항목 | 값 |
+| Item | Value |
 |------|-----|
-| 모델 | sonnet |
-| 서브에이전트 타입 | `oh-my-claudecode:qa-tester` |
-| 레인 | Domain |
-| 필수 도구 | tmux |
+| Model | sonnet |
+| Subagent Type | `oh-my-claudecode:qa-tester` |
+| Lane | Domain |
+| Required Tool | tmux |

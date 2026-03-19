@@ -1,43 +1,43 @@
 ---
 title: State
-description: 실행 모드의 상태를 관리하는 MCP 도구 그룹
+description: MCP tool group for managing execution mode state
 ---
 
-## 개요
+## Overview
 
-State 도구는 OMC 실행 모드(autopilot, ralph, ultrawork 등)의 상태를 관리합니다. 각 모드는 상태 파일에 현재 진행 상황, 활성 여부, 설정을 기록합니다.
+The State tools manage the state of OMC execution modes (autopilot, ralph, ultrawork, etc.). Each mode records its current progress, active status, and configuration in state files.
 
-## 저장 경로
+## Storage Path
 
 ```
 .omc/state/
-├── sessions/{sessionId}/     # 세션별 상태
+├── sessions/{sessionId}/     # Per-session state
 │   ├── autopilot-state.json
 │   ├── ralph-state.json
 │   └── ultrawork-state.json
-├── autopilot-state.json      # 레거시 호환
+├── autopilot-state.json      # Legacy compatibility
 ├── ralph-state.json
 └── ultrawork-state.json
 ```
 
-세션 ID가 제공되면 세션 범위 경로를 사용하고, 없으면 레거시 경로를 폴백으로 사용합니다.
+When a session ID is provided, the session-scoped path is used; otherwise the legacy path is used as a fallback.
 
-## 도구 목록
+## Tool List
 
 ### state_read
 
-지정한 모드의 상태를 읽습니다.
+Reads the state for the specified mode.
 
 ```
 state_read(mode="ralph")
 state_read(mode="ralph", session_id="abc123")
 ```
 
-상태 파일이 없으면 빈 응답을 반환합니다.
+Returns an empty response if the state file does not exist.
 
 ### state_write
 
-지정한 모드의 상태를 저장합니다.
+Saves the state for the specified mode.
 
 ```
 state_write(mode="ralph", state={
@@ -50,50 +50,50 @@ state_write(mode="ralph", state={
 
 ### state_clear
 
-지정한 모드의 상태 파일을 삭제합니다.
+Deletes the state file for the specified mode.
 
 ```
 state_clear(mode="ralph")
 state_clear(mode="ralph", session_id="abc123")
 ```
 
-세션 ID 없이 호출하면 레거시 파일을 정리합니다.
+Calling without a session ID cleans up legacy files.
 
 ### state_list_active
 
-현재 활성 중인 모든 모드를 나열합니다.
+Lists all currently active modes.
 
 ```
 state_list_active()
 ```
 
-활성 상태 파일이 있는 모드들을 반환합니다.
+Returns modes that have active state files.
 
 ### state_get_status
 
-특정 모드 또는 전체 모드의 상세 상태를 반환합니다.
+Returns detailed status for a specific mode or all modes.
 
 ```
 state_get_status(mode="ralph")
 ```
 
-활성 상태, 파일 경로, 상태 내용을 포함합니다.
+Includes active status, file path, and state contents.
 
-## 환경 변수
+## Environment Variables
 
-| 변수 | 기본값 | 설명 |
+| Variable | Default | Description |
 |------|--------|------|
-| `OMC_STATE_DIR` | (미설정) | 중앙 집중식 상태 디렉토리. 설정 시 worktree 삭제에도 상태 보존 |
+| `OMC_STATE_DIR` | (unset) | Centralized state directory. When set, state is preserved even if the worktree is deleted |
 
-`OMC_STATE_DIR`을 설정하면 상태가 `$OMC_STATE_DIR/{project-id}/`에 저장됩니다.
+When `OMC_STATE_DIR` is set, state is stored in `$OMC_STATE_DIR/{project-id}/`.
 
 ```bash
 export OMC_STATE_DIR="$HOME/.claude/omc"
 ```
 
-## 사용 패턴
+## Usage Patterns
 
-### 모드 활성화
+### Activate a Mode
 
 ```
 state_write(mode="autopilot", state={
@@ -103,13 +103,13 @@ state_write(mode="autopilot", state={
 })
 ```
 
-### 모드 비활성화
+### Deactivate a Mode
 
 ```
 state_clear(mode="autopilot")
 ```
 
-### 활성 모드 확인
+### Check Active Modes
 
 ```
 state_list_active()
