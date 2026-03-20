@@ -19,7 +19,7 @@ This directory contains documentation for end-users and developers:
 |------|-------------|
 | `GETTING-STARTED.md` | Installation, first session, and configuration guide |
 | `ARCHITECTURE.md` | System architecture overview (agents, skills, hooks, state) |
-| `HOOKS.md` | Comprehensive hooks system documentation (31 hooks) |
+| `HOOKS.md` | Comprehensive hooks system documentation (20 hooks across 11 events) |
 | `TOOLS.md` | MCP tools reference (state, notepad, LSP, AST, Python REPL) |
 | `REFERENCE.md` | Quick-reference for agents, skills, hooks, and configuration |
 | `FEATURES.md` | Internal developer API reference |

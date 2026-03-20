@@ -122,7 +122,7 @@ omc ask claude --agent-prompt executor --prompt "create an implementation plan"
 
 - Provider matrix: `claude | codex | gemini`
 - Artifacts: `.omc/artifacts/ask/{provider}-{slug}-{timestamp}.md`
-- Skill shortcuts: `/oh-my-claudecode:ask-codex` and `/oh-my-claudecode:ask-gemini`
+- Skill shortcut: `/oh-my-claudecode:ask`
 
 ### `omc team` (CLI runtime surface)
 
@@ -181,11 +181,11 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool. For full agent
 | **Pre-Planning** | — | — | `analyst` |
 | **Testing** | — | `qa-tester` | — |
 | **Tracing** | — | `tracer` | — |
-| **Security** | `security-reviewer-low` | — | `security-reviewer` |
+| **Security** | — | `security-reviewer` | — |
 | **Build** | — | `debugger` | — |
 | **TDD** | — | `test-engineer` | — |
 | **Code Review** | — | — | `code-reviewer` |
-| **Data Science** | — | `scientist` | `scientist-high` |
+| **Data Science** | — | `scientist` | — |
 
 ### Agent Selection Guide
 
@@ -197,7 +197,7 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool. For full agent
 | Feature implementation | `executor` | sonnet |
 | Complex refactoring | `executor-high` | opus |
 | Debug simple / complex issue | `debugger` / `architect` | sonnet / opus |
-| UI component / system | `designer` / `designer-high` | sonnet / opus |
+| UI component / system | `designer` | sonnet |
 | Write docs | `writer` | haiku |
 | Research docs/APIs | `document-specialist` | sonnet |
 | Strategic planning | `planner` | opus |
@@ -205,10 +205,10 @@ Always use `oh-my-claudecode:` prefix when calling via Task tool. For full agent
 | Pre-planning analysis | `analyst` | opus |
 | Test CLI interactively | `qa-tester` | sonnet |
 | Evidence-driven tracing | `tracer` | sonnet |
-| Security review / quick scan | `security-reviewer` / `security-reviewer-low` | opus / haiku |
+| Security review | `security-reviewer` | sonnet |
 | TDD workflow | `test-engineer` | sonnet |
 | Code review | `code-reviewer` | opus |
-| Data analysis | `scientist` / `scientist-high` | sonnet / opus |
+| Data analysis | `scientist` | sonnet |
 
 ---
 

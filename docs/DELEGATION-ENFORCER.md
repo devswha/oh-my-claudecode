@@ -146,7 +146,7 @@ console.log(result.modifiedInput.model); // 'sonnet'
 | `designer-low` | haiku | Simple styling |
 | `document-specialist` | sonnet | Documentation lookup |
 | `writer` | haiku | Documentation writing |
-| `vision` | sonnet | Image analysis |
+| `document-specialist` | sonnet | Documentation & reference lookup |
 | `planner` | opus | Strategic planning |
 | `critic` | opus | Plan review |
 | `analyst` | opus | Pre-planning analysis |
