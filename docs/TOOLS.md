@@ -16,6 +16,7 @@ Unlike skills that users invoke directly, tools are used internally by agents du
 - [Trace](#trace) — Agent flow trace analysis
 - [Shared Memory](#shared-memory) — Cross-agent shared memory for team coordination
 - [Skills](#skills) — Internal skill management tools
+- [Deepinit Manifest](#deepinit-manifest) — Incremental AGENTS.md regeneration manifest
 
 ---
 
@@ -746,3 +747,35 @@ Lists all available OMC skills (built-in + local + global).
 ```
 list_omc_skills()
 ```
+
+---
+
+## Deepinit Manifest
+
+Manages the manifest for incremental AGENTS.md regeneration. Compares directory file lists to detect structural changes, enabling the `deepinit` skill to only regenerate documentation for directories that have changed.
+
+### Tool
+
+#### `deepinit_manifest`
+
+Manages the deepinit manifest with three actions.
+
+**diff** — Find directories with structural changes since last generation:
+
+```
+deepinit_manifest(action="diff")
+```
+
+**save** — Persist the current directory structure as the new baseline:
+
+```
+deepinit_manifest(action="save")
+```
+
+**check** — Validate the existing manifest:
+
+```
+deepinit_manifest(action="check")
+```
+
+Used internally by the `deepinit` skill (`/oh-my-claudecode:deepinit`) to enable incremental AGENTS.md regeneration instead of full re-scans.
