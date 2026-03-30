@@ -2,7 +2,7 @@
 
 > OMC provides MCP tools for state management, code intelligence, and data analysis.
 
-Unlike [skills](../docs/SKILLS.md) that users invoke directly, tools are used internally by agents during task execution.
+Unlike skills that users invoke directly, tools are used internally by agents during task execution.
 
 ## Tool Categories
 
@@ -12,6 +12,10 @@ Unlike [skills](../docs/SKILLS.md) that users invoke directly, tools are used in
 - [LSP](#lsp) — Language Server Protocol code intelligence (12 tools)
 - [AST Grep](#ast-grep) — Structural AST-based code search and replacement
 - [Python REPL](#python-repl) — Persistent Python execution environment
+- [Session Search](#session-search) — Search previous session history
+- [Trace](#trace) — Agent flow trace analysis
+- [Shared Memory](#shared-memory) — Cross-agent shared memory for team coordination
+- [Skills](#skills) — Internal skill management tools
 
 ---
 
@@ -619,4 +623,126 @@ for ext, count in sorted(extensions.items(), key=lambda x: -x[1]):
 
 ### Integration with scientist Agent
 
-The `scientist` agent uses `python_repl` for data analysis tasks. In the [SciOMC](../docs/skills/workflow/sciomc.md) research workflow, it is used for statistical analysis and visualization.
+The `scientist` agent uses `python_repl` for data analysis tasks.
+
+---
+
+## Session Search
+
+Search previous local session history and transcript artifacts.
+
+### Tool
+
+#### `session_search`
+
+Searches session history and returns matching excerpts.
+
+```
+session_search(query="authentication refactor")
+```
+
+Returns session IDs, timestamps, source paths, and matching excerpts as structured JSON.
+
+---
+
+## Trace
+
+Analyze agent flow trace data for debugging and performance analysis.
+
+### Tools
+
+#### `trace_timeline`
+
+Displays hooks, keywords, skills, agents, and tools in chronological order.
+
+```
+trace_timeline()
+```
+
+#### `trace_summary`
+
+Aggregates hook statistics, keyword frequency, skill activations, mode transitions, and tool bottlenecks.
+
+```
+trace_summary()
+```
+
+---
+
+## Shared Memory
+
+Cross-agent shared memory for team coordination. Enables agents to share data across team boundaries during coordinated workflows.
+
+### Tools
+
+#### `shared_memory_write`
+
+Writes a value to shared memory.
+
+```
+shared_memory_write(key="auth-spec", value="JWT with refresh tokens")
+```
+
+#### `shared_memory_read`
+
+Reads a value from shared memory.
+
+```
+shared_memory_read(key="auth-spec")
+```
+
+#### `shared_memory_list`
+
+Lists all keys in shared memory.
+
+```
+shared_memory_list()
+```
+
+#### `shared_memory_delete`
+
+Deletes a key from shared memory.
+
+```
+shared_memory_delete(key="auth-spec")
+```
+
+#### `shared_memory_cleanup`
+
+Removes all entries from shared memory.
+
+```
+shared_memory_cleanup()
+```
+
+---
+
+## Skills
+
+Internal skill management tools used by the runtime to load and list available skills.
+
+### Tools
+
+#### `load_omc_skills_local`
+
+Loads skills from the local project directory (`.omc/skills/`).
+
+```
+load_omc_skills_local()
+```
+
+#### `load_omc_skills_global`
+
+Loads skills from the global user directory (`~/.claude/skills/`).
+
+```
+load_omc_skills_global()
+```
+
+#### `list_omc_skills`
+
+Lists all available OMC skills (built-in + local + global).
+
+```
+list_omc_skills()
+```
