@@ -47,7 +47,6 @@ import { injectToLeaderPane, sendToWorker } from './tmux-session.js';
 import { listDispatchRequests, markDispatchRequestDelivered, markDispatchRequestNotified } from './dispatch-queue.js';
 import { generateMailboxTriggerMessage } from './worker-bootstrap.js';
 import { shutdownTeam } from './runtime.js';
-import { resolveLifecycleProfile } from './governance.js';
 import { shutdownTeamV2 } from './runtime-v2.js';
 
 const TEAM_UPDATE_TASK_MUTABLE_FIELDS = new Set(['subject', 'description', 'blocked_by', 'requires_code_change']);
@@ -275,8 +274,10 @@ function resolveTeamWorkingDirectoryFromMetadata(
   const fromConfig = readTeamStateRootFromFile(join(teamRoot, 'config.json'));
   if (fromConfig) return stateRootToWorkingDirectory(fromConfig);
 
-  const fromManifest = readTeamStateRootFromFile(join(teamRoot, 'manifest.v2.json'));
-  if (fromManifest) return stateRootToWorkingDirectory(fromManifest);
+  for (const manifestName of ['manifest.json', 'manifest.v2.json']) {
+    const fromManifest = readTeamStateRootFromFile(join(teamRoot, manifestName));
+    if (fromManifest) return stateRootToWorkingDirectory(fromManifest);
+  }
 
   return null;
 }

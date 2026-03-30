@@ -14,7 +14,8 @@ import { homedir } from 'os';
 import { killWorkerPanes, killTeamSession } from '../team/tmux-session.js';
 import { validateTeamName } from '../team/team-name.js';
 import { NudgeTracker } from '../team/idle-nudge.js';
-import { clearScopedTeamState, convergeJobWithResultArtifact, isJobTerminal, isPidAlive, } from './team-job-convergence.js';
+import { clearScopedTeamState, convergeJobWithResultArtifact, isJobTerminal, } from './team-job-convergence.js';
+import { isProcessAlive } from '../platform/index.js';
 const omcTeamJobs = new Map();
 const OMC_JOBS_DIR = process.env.OMC_JOBS_DIR || join(homedir(), '.omc', 'team-jobs');
 const DEPRECATION_CODE = 'deprecated_cli_only';
@@ -265,7 +266,7 @@ export async function handleStatus(args) {
     if (isJobTerminal(job)) {
         return makeJobResponse(job_id, job);
     }
-    if (job.pid != null && !isPidAlive(job.pid)) {
+    if (job.pid != null && !isProcessAlive(job.pid)) {
         job = saveJobState(job_id, {
             ...job,
             status: 'failed',
@@ -310,7 +311,7 @@ export async function handleWait(args) {
             }
             return out;
         }
-        if (job.pid != null && !isPidAlive(job.pid)) {
+        if (job.pid != null && !isProcessAlive(job.pid)) {
             job = saveJobState(job_id, {
                 ...job,
                 status: 'failed',

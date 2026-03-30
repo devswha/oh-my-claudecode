@@ -12,6 +12,7 @@
 import { openSync, closeSync, unlinkSync, writeSync, readFileSync, statSync, constants as fsConstants, } from "fs";
 import * as path from "path";
 import { ensureDirSync } from "./atomic-write.js";
+import { isProcessAlive } from "../platform/index.js";
 // ============================================================================
 // Constants
 // ============================================================================
@@ -20,27 +21,6 @@ const DEFAULT_RETRY_DELAY_MS = 50;
 // ============================================================================
 // Internal helpers
 // ============================================================================
-/**
- * Check if a process with the given PID is alive.
- * Returns false for invalid PIDs or if kill(pid, 0) throws ESRCH.
- */
-function isPidAlive(pid) {
-    if (pid <= 0 || !Number.isFinite(pid))
-        return false;
-    try {
-        process.kill(pid, 0);
-        return true;
-    }
-    catch (e) {
-        // EPERM means the process exists but we lack permission -- still alive
-        if (e &&
-            typeof e === "object" &&
-            "code" in e &&
-            e.code === "EPERM")
-            return true;
-        return false;
-    }
-}
 /**
  * Check if an existing lock file is stale.
  * A lock is stale if older than staleLockMs AND the owning PID is dead.
@@ -55,7 +35,7 @@ function isLockStale(lockPath, staleLockMs) {
         try {
             const raw = readFileSync(lockPath, "utf-8");
             const payload = JSON.parse(raw);
-            if (payload.pid && isPidAlive(payload.pid))
+            if (payload.pid && isProcessAlive(payload.pid))
                 return false;
         }
         catch {

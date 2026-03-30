@@ -1,11 +1,12 @@
 ---
 name: deep-interview
 description: Socratic deep interview with mathematical ambiguity gating before autonomous execution
-argument-hint: "<idea or vague description>"
+argument-hint: "[--quick|--standard|--deep] [--autoresearch] <idea or vague description>"
 pipeline: [deep-interview, omc-plan, autopilot]
 next-skill: omc-plan
 next-skill-args: --consensus --direct
 handoff: .omc/specs/deep-interview-{slug}.md
+level: 3
 ---
 
 <Purpose>
@@ -38,13 +39,26 @@ Inspired by the [Ouroboros project](https://github.com/Q00/ouroboros) which demo
 <Execution_Policy>
 - Ask ONE question at a time -- never batch multiple questions
 - Target the WEAKEST clarity dimension with each question
+- Make weakest-dimension targeting explicit every round: name the weakest dimension, state its score/gap, and explain why the next question is aimed there
 - Gather codebase facts via `explore` agent BEFORE asking the user about them
+- For brownfield confirmation questions, cite the repo evidence that triggered the question (file path, symbol, or pattern) instead of asking the user to rediscover it
 - Score ambiguity after every answer -- display the score transparently
 - Do not proceed to execution until ambiguity ≤ threshold (default 0.2)
 - Allow early exit with a clear warning if ambiguity is still high
 - Persist interview state for resume across session interruptions
 - Challenge agents activate at specific round thresholds to shift perspective
 </Execution_Policy>
+
+<Autoresearch_Mode>
+When arguments include `--autoresearch`, Deep Interview becomes the zero-learning-curve setup lane for `omc autoresearch`.
+
+- If no usable mission brief is present yet, start by asking: **"What should autoresearch improve or prove for this repo?"**
+- After the mission is clear, collect an evaluator command. If the user leaves it blank, infer one only when repo evidence is strong; otherwise keep interviewing until an evaluator is explicit enough to launch safely.
+- Keep the usual one-question-per-round rule, but treat **mission clarity** and **evaluator clarity** as hard readiness gates in addition to the normal ambiguity threshold.
+- Once ready, do **not** bridge into `omc-plan`, `autopilot`, `ralph`, or `team`. Instead run:
+  - `omc autoresearch --mission "<mission>" --eval "<evaluator>" [--keep-policy <policy>] [--slug <slug>]`
+- This direct handoff is expected to detach into the real autoresearch runtime tmux session. After a successful handoff, announce the launched session and end the interview lane.
+</Autoresearch_Mode>
 
 <Steps>
 
@@ -100,7 +114,9 @@ Build the question generation prompt with:
 **Question targeting strategy:**
 - Identify the dimension with the LOWEST clarity score
 - Generate a question that specifically improves that dimension
+- State, in one sentence before the question, why this dimension is now the bottleneck to reducing ambiguity
 - Questions should expose ASSUMPTIONS, not gather feature lists
+- If the scope is still conceptually fuzzy (entities keep shifting, the user is naming symptoms, or the core noun is unstable), switch to an ontology-style question that asks what the thing fundamentally IS before returning to feature/detail questions
 
 **Question styles by dimension:**
 | Dimension | Question Style | Example |
@@ -108,14 +124,15 @@ Build the question generation prompt with:
 | Goal Clarity | "What exactly happens when...?" | "When you say 'manage tasks', what specific action does a user take first?" |
 | Constraint Clarity | "What are the boundaries?" | "Should this work offline, or is internet connectivity assumed?" |
 | Success Criteria | "How do we know it works?" | "If I showed you the finished product, what would make you say 'yes, that's it'?" |
-| Context Clarity (brownfield) | "How does this fit?" | "The existing auth uses JWT in src/auth/. Should we extend that or add a separate flow?" |
+| Context Clarity (brownfield) | "How does this fit?" | "I found JWT auth middleware in `src/auth/` (pattern: passport + JWT). Should this feature extend that path or intentionally diverge from it?" |
+| Scope-fuzzy / ontology stress | "What IS the core thing here?" | "You have named Tasks, Projects, and Workspaces across the last rounds. Which one is the core entity, and which are supporting views or containers?" |
 
 ### Step 2b: Ask the Question
 
 Use `AskUserQuestion` with the generated question. Present it clearly with the current ambiguity context:
 
 ```
-Round {n} | Targeting: {weakest_dimension} | Ambiguity: {score}%
+Round {n} | Targeting: {weakest_dimension} | Why now: {one_sentence_targeting_rationale} | Ambiguity: {score}%
 
 {question}
 ```
@@ -146,6 +163,10 @@ For each dimension provide:
 - score: float (0.0-1.0)
 - justification: one sentence explaining the score
 - gap: what's still unclear (if score < 0.9)
+
+Also identify:
+- weakest_dimension: the single lowest-confidence dimension this round
+- weakest_dimension_rationale: one sentence explaining why it is the highest-leverage target for the next question
 
 5. Ontology Extraction: Identify all key entities (nouns) discussed in the transcript.
 
@@ -198,6 +219,8 @@ Round {n} complete.
 | **Ambiguity** | | | **{score}%** | |
 
 **Ontology:** {entity_count} entities | Stability: {stability_ratio} | New: {new} | Changed: {changed} | Stable: {stable}
+
+**Next target:** {weakest_dimension} — {weakest_dimension_rationale}
 
 {score <= threshold ? "Clarity threshold met! Ready to proceed." : "Focusing next question on: {weakest_dimension}"}
 ```
@@ -320,6 +343,8 @@ Spec structure:
 
 ## Phase 5: Execution Bridge
 
+**Autoresearch override:** if `--autoresearch` is active, skip the standard execution options below. The only valid bridge is the direct `omc autoresearch --mission ... --eval ...` handoff described above.
+
 After the spec is written, present execution options via `AskUserQuestion`:
 
 **Question:** "Your spec is ready (ambiguity: {score}%). How would you like to proceed?"
@@ -395,7 +420,7 @@ Next question targets Constraints (lowest at 0.4):
 a responsive web app, or a PWA? And are there specific devices or OS versions
 you need to support?"
 ```
-Why good: Identifies weakest dimension, asks specific question to improve it, doesn't batch multiple topics.
+Why good: Identifies weakest dimension, explains why it is now the bottleneck, asks a specific question to improve it, and doesn't batch multiple topics.
 </Good>
 
 <Good>
@@ -404,11 +429,11 @@ Gathering codebase facts before asking:
 [spawns explore agent: "find authentication implementation"]
 [receives: "Auth is in src/auth/ using JWT with passport.js"]
 
-Question: "I see your project uses JWT authentication with passport.js in src/auth/.
+Question: "I found JWT authentication with passport.js in `src/auth/` (pattern match from explore).
 For this new feature, should we extend the existing auth middleware or create
 a separate authentication flow?"
 ```
-Why good: Explored first, then asked an informed question. Never asks the user what the code already reveals.
+Why good: Explored first, cited the repo evidence that triggered the question, then asked an informed confirmation question. Never asks the user what the code already reveals.
 </Good>
 
 <Good>
@@ -450,6 +475,16 @@ with no changes. The domain model is stable."
 Why good: Shows entity tracking across rounds with visible convergence. Stability ratio increases as the domain model solidifies, giving mathematical evidence that the interview is converging on a stable understanding.
 </Good>
 
+<Good>
+Ontology-style question for scope-fuzzy tasks:
+```
+Round 6 | Targeting: Goal Clarity | Why now: the core entity is still unstable across rounds, so feature questions would compound ambiguity | Ambiguity: 38%
+
+"Across the last rounds you've described this as a workflow, an inbox, and a planner. Which one is the core thing this product IS, and which ones are supporting metaphors or views?"
+```
+Why good: Uses ontology-style questioning to stabilize the core noun before drilling into features, which is the right move when the scope is fuzzy rather than merely incomplete.
+</Good>
+
 <Bad>
 Batching multiple questions:
 ```
@@ -489,6 +524,7 @@ Why bad: 45% ambiguity means nearly half the requirements are unclear. The mathe
 <Final_Checklist>
 - [ ] Interview completed (ambiguity ≤ threshold OR user chose early exit)
 - [ ] Ambiguity score displayed after every round
+- [ ] Every round explicitly names the weakest dimension and why it is the next target
 - [ ] Challenge agents activated at correct thresholds (round 4, 6, 8)
 - [ ] Spec file written to `.omc/specs/deep-interview-{slug}.md`
 - [ ] Spec includes: goal, constraints, acceptance criteria, clarity breakdown, transcript
@@ -496,6 +532,8 @@ Why bad: 45% ambiguity means nearly half the requirements are unclear. The mathe
 - [ ] Selected execution mode invoked via Skill() (never direct implementation)
 - [ ] If 3-stage pipeline selected: omc-plan --consensus --direct invoked, then autopilot with consensus plan
 - [ ] State cleaned up after execution handoff
+- [ ] Brownfield confirmation questions cite repo evidence (file/path/pattern) before asking the user to decide
+- [ ] Scope-fuzzy tasks can trigger ontology-style questioning to stabilize the core entity before feature elaboration
 - [ ] Per-round ambiguity report includes Ontology row with entity count and stability ratio
 - [ ] Spec includes Ontology (Key Entities) table and Ontology Convergence section
 </Final_Checklist>

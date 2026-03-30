@@ -49,6 +49,7 @@ import {
 import { checkAutopilot } from '../autopilot/enforcement.js';
 import { readTeamPipelineState } from '../team-pipeline/state.js';
 import type { TeamPipelinePhase } from '../team-pipeline/types.js';
+import { getActiveAgentCount } from '../subagent-tracker/index.js';
 
 export interface ToolErrorState {
   tool_name: string;
@@ -360,6 +361,14 @@ function isCriticalContextStop(stopContext?: StopContext): boolean {
   return estimateTranscriptContextPercent(transcriptPath) >= CRITICAL_CONTEXT_STOP_PERCENT;
 }
 
+function isAwaitingConfirmation(state: unknown): boolean {
+  return Boolean(
+    state &&
+    typeof state === 'object' &&
+    (state as Record<string, unknown>).awaiting_confirmation === true
+  );
+}
+
 /**
  * Check for architect approval in session transcript
  */
@@ -431,6 +440,10 @@ async function checkRalphLoop(
 
   // Strict session isolation: only process state for matching session
   if (state.session_id !== sessionId) {
+    return null;
+  }
+
+  if (isAwaitingConfirmation(state)) {
     return null;
   }
 
@@ -864,6 +877,10 @@ async function checkRalplan(
     return null;
   }
 
+  if (isAwaitingConfirmation(state)) {
+    return null;
+  }
+
   // Terminal phase detection — allow stop when ralplan has completed
   const currentPhase = (state as unknown as Record<string, unknown>).current_phase;
   if (typeof currentPhase === 'string') {
@@ -881,6 +898,18 @@ async function checkRalplan(
       shouldBlock: false,
       message: '',
       mode: 'ralplan'
+    };
+  }
+
+  // Orchestrators are allowed to go idle while delegated work is still active.
+  // Delegation waits are expected, so clear any accumulated breaker budget and
+  // let enforcement resume from a clean slate after the running subagents finish.
+  if (getActiveAgentCount(workingDir) > 0) {
+    writeStopBreaker(workingDir, 'ralplan', 0, sessionId);
+    return {
+      shouldBlock: false,
+      message: '',
+      mode: 'ralplan',
     };
   }
 
@@ -933,6 +962,10 @@ async function checkUltrawork(
 
   // Strict session isolation: only process state for matching session
   if (state.session_id !== sessionId) {
+    return null;
+  }
+
+  if (isAwaitingConfirmation(state)) {
     return null;
   }
 

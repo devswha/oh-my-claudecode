@@ -19,6 +19,7 @@ import { spawn } from 'child_process';
 import { resolveDaemonModulePath } from '../../utils/daemon-module-path.js';
 import { checkRateLimitStatus, formatRateLimitStatus, isRateLimitStatusDegraded, shouldMonitorBlockedPanes, } from './rate-limit-monitor.js';
 import { isTmuxAvailable, scanForBlockedPanes, sendResumeSequence, formatBlockedPanesSummary, } from './tmux-detector.js';
+import { isProcessAlive } from '../../platform/index.js';
 // ESM compatibility: __filename is not available in ES modules
 const __filename = fileURLToPath(import.meta.url);
 /** Default configuration */
@@ -203,19 +204,6 @@ function removePidFile(config) {
     }
 }
 /**
- * Check if a process is running
- */
-function isProcessRunning(pid) {
-    try {
-        // Signal 0 doesn't actually send a signal, just checks if process exists
-        process.kill(pid, 0);
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
-/**
  * Check if daemon is currently running
  */
 export function isDaemonRunning(config) {
@@ -224,7 +212,7 @@ export function isDaemonRunning(config) {
     if (pid === null) {
         return false;
     }
-    if (!isProcessRunning(pid)) {
+    if (!isProcessAlive(pid)) {
         // Stale PID file, clean up
         removePidFile(cfg);
         return false;
@@ -504,7 +492,7 @@ export function stopDaemon(config) {
             message: 'Daemon is not running',
         };
     }
-    if (!isProcessRunning(pid)) {
+    if (!isProcessAlive(pid)) {
         removePidFile(cfg);
         return {
             success: true,

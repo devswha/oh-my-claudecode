@@ -7,11 +7,14 @@
  */
 
 import { existsSync, readFileSync, writeFileSync, unlinkSync, renameSync } from 'fs';
+import { join } from 'path';
 import {
+  getOmcRoot,
   resolveStatePath,
   resolveSessionStatePath,
   ensureSessionStateDir,
   ensureOmcDir,
+  listSessionIds,
 } from './worktree-paths.js';
 
 export function getStateSessionOwner(state: Record<string, unknown> | null | undefined): string | undefined {
@@ -56,6 +59,16 @@ function resolveFile(mode: string, directory?: string, sessionId?: string): stri
     return resolveSessionStatePath(mode, sessionId, baseDir);
   }
   return resolveStatePath(mode, baseDir);
+}
+
+function getLegacyStateCandidates(mode: string, directory?: string): string[] {
+  const baseDir = directory || process.cwd();
+  const normalizedName = mode.endsWith('-state') ? mode : `${mode}-state`;
+
+  return [
+    resolveStatePath(mode, baseDir),
+    join(getOmcRoot(baseDir), `${normalizedName}.json`),
+  ];
 }
 
 // ---------------------------------------------------------------------------
@@ -145,20 +158,37 @@ export function clearModeStateFile(
   sessionId?: string,
 ): boolean {
   let success = true;
-  const filePath = resolveFile(mode, directory, sessionId);
+  const unlinkIfPresent = (filePath: string): void => {
+    if (!existsSync(filePath)) {
+      return;
+    }
 
-  if (existsSync(filePath)) {
     try {
       unlinkSync(filePath);
     } catch {
       success = false;
     }
+  };
+
+  if (sessionId) {
+    unlinkIfPresent(resolveFile(mode, directory, sessionId));
+  } else {
+    for (const legacyPath of getLegacyStateCandidates(mode, directory)) {
+      unlinkIfPresent(legacyPath);
+    }
+
+    for (const sid of listSessionIds(directory)) {
+      unlinkIfPresent(resolveSessionStatePath(mode, sid, directory));
+    }
   }
 
   // Ghost-legacy cleanup: if sessionId provided, also check legacy path
   if (sessionId) {
-    const legacyPath = resolveFile(mode, directory); // no sessionId = legacy
-    if (existsSync(legacyPath)) {
+    for (const legacyPath of getLegacyStateCandidates(mode, directory)) {
+      if (!existsSync(legacyPath)) {
+        continue;
+      }
+
       try {
         const content = readFileSync(legacyPath, 'utf-8');
         const legacyState = JSON.parse(content) as Record<string, unknown>;

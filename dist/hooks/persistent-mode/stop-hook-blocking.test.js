@@ -12,6 +12,17 @@ function writeTranscriptWithContext(filePath, contextWindow, inputTokens) {
         input_tokens: inputTokens,
     })}\n`);
 }
+function writeSubagentTrackingState(tempDir, agents) {
+    const stateDir = join(tempDir, ".omc", "state");
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, "subagent-tracking.json"), JSON.stringify({
+        agents,
+        total_spawned: agents.length,
+        total_completed: agents.filter((agent) => agent.status === "completed").length,
+        total_failed: agents.filter((agent) => agent.status === "failed").length,
+        last_updated: new Date().toISOString(),
+    }, null, 2));
+}
 describe("Stop Hook Blocking Contract", () => {
     describe("createHookOutput", () => {
         it("returns continue: false when shouldBlock is true", () => {
@@ -237,7 +248,7 @@ describe("Stop Hook Blocking Contract", () => {
         afterEach(() => {
             rmSync(tempDir, { recursive: true, force: true });
         });
-        it("returns continue: false when ralph is active", () => {
+        it("returns decision: block when ralph is active", () => {
             const sessionId = "ralph-mjs-test";
             const sessionDir = join(tempDir, ".omc", "state", "sessions", sessionId);
             mkdirSync(sessionDir, { recursive: true });
@@ -251,10 +262,9 @@ describe("Stop Hook Blocking Contract", () => {
                 prompt: "Test task",
             }));
             const output = runScript({ directory: tempDir, sessionId });
-            expect(output.continue).toBe(false);
             expect(output.decision).toBe("block");
         });
-        it("returns continue: false when ultrawork is active", () => {
+        it("returns decision: block when ultrawork is active", () => {
             const sessionId = "ultrawork-mjs-test";
             const sessionDir = join(tempDir, ".omc", "state", "sessions", sessionId);
             mkdirSync(sessionDir, { recursive: true });
@@ -267,7 +277,6 @@ describe("Stop Hook Blocking Contract", () => {
                 last_checked_at: new Date().toISOString(),
             }));
             const output = runScript({ directory: tempDir, sessionId });
-            expect(output.continue).toBe(false);
             expect(output.decision).toBe("block");
         });
         it("returns continue: true for context limit stop", () => {
@@ -455,6 +464,35 @@ describe("Stop Hook Blocking Contract", () => {
             });
             expect(output.continue).toBe(true);
         });
+        it("returns continue: true when skill state is active but delegated subagents are still running", () => {
+            const sessionId = "skill-active-subagents-cjs";
+            const sessionDir = join(tempDir, ".omc", "state", "sessions", sessionId);
+            mkdirSync(sessionDir, { recursive: true });
+            writeFileSync(join(sessionDir, "skill-active-state.json"), JSON.stringify({
+                active: true,
+                skill_name: "ralplan",
+                session_id: sessionId,
+                started_at: new Date().toISOString(),
+                last_checked_at: new Date().toISOString(),
+                reinforcement_count: 0,
+                max_reinforcements: 5,
+                stale_ttl_ms: 15 * 60 * 1000,
+            }));
+            writeSubagentTrackingState(tempDir, [
+                {
+                    agent_id: "agent-cjs-1",
+                    agent_type: "explore",
+                    started_at: new Date().toISOString(),
+                    parent_mode: "none",
+                    status: "running",
+                },
+            ]);
+            const output = runScript({ directory: tempDir, sessionId });
+            expect(output.continue).toBe(true);
+            expect(output.decision).toBeUndefined();
+            const persisted = JSON.parse(readFileSync(join(sessionDir, "skill-active-state.json"), "utf-8"));
+            expect(persisted.reinforcement_count).toBe(0);
+        });
         it("returns continue: true for critical transcript context when autopilot is active", () => {
             const sessionId = "autopilot-critical-context-cjs";
             const sessionDir = join(tempDir, ".omc", "state", "sessions", sessionId);
@@ -477,6 +515,23 @@ describe("Stop Hook Blocking Contract", () => {
             });
             expect(output.continue).toBe(true);
             expect(output.decision).toBeUndefined();
+        });
+        it("omits cancel guidance for legacy autopilot state without a session id in cjs script", () => {
+            const stateDir = join(tempDir, ".omc", "state");
+            mkdirSync(stateDir, { recursive: true });
+            writeFileSync(join(stateDir, "autopilot-state.json"), JSON.stringify({
+                active: true,
+                phase: "execution",
+                reinforcement_count: 0,
+                last_checked_at: new Date().toISOString(),
+                started_at: new Date().toISOString(),
+            }));
+            const output = runScript({
+                directory: tempDir,
+            });
+            expect(output.decision).toBe("block");
+            expect(output.reason).toContain("AUTOPILOT");
+            expect(output.reason).not.toContain('/oh-my-claudecode:cancel');
         });
         it("fails open for unknown Team phase in cjs script", () => {
             const sessionId = "team-phase-cjs";

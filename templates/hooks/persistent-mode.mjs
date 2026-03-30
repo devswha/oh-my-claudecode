@@ -193,6 +193,10 @@ function getSafeReinforcementCount(value) {
     : 0;
 }
 
+function isAwaitingConfirmation(state) {
+  return state?.awaiting_confirmation === true;
+}
+
 /**
  * Check if a skill active state is stale based on its per-skill TTL.
  * Unlike mode states (which use the global 2-hour threshold), skill states
@@ -347,6 +351,18 @@ function readStateFileWithSession(stateDir, globalStateDir, filename, sessionId)
   }
 
   return readStateFile(stateDir, globalStateDir, filename);
+}
+
+function getActiveSubagentCount(stateDir) {
+  try {
+    const tracking = readJsonFile(join(stateDir, "subagent-tracking.json"));
+    if (!tracking || !Array.isArray(tracking.agents)) {
+      return 0;
+    }
+    return tracking.agents.filter((agent) => agent?.status === "running").length;
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -628,7 +644,7 @@ async function main() {
     // Priority 1: Ralph Loop (explicit persistence mode)
     // Skip if state is stale (older than 2 hours) - prevents blocking new sessions
     if (
-      ralph.state?.active &&
+      ralph.state?.active && !isAwaitingConfirmation(ralph.state) &&
       !isStaleState(ralph.state) &&
       isStateForCurrentProject(ralph.state, directory, ralph.isGlobal)
     ) {
@@ -681,7 +697,7 @@ async function main() {
 
     // Priority 2: Autopilot (high-level orchestration)
     if (
-      autopilot.state?.active &&
+      autopilot.state?.active && !isAwaitingConfirmation(autopilot.state) &&
       !isStaleState(autopilot.state) &&
       isStateForCurrentProject(autopilot.state, directory, autopilot.isGlobal)
     ) {
@@ -915,7 +931,7 @@ async function main() {
     // Session isolation: only block if state belongs to this session (issue #311)
     // If state has session_id, it must match. If no session_id (legacy), allow.
     if (
-      ultrawork.state?.active &&
+      ultrawork.state?.active && !isAwaitingConfirmation(ultrawork.state) &&
       !isStaleState(ultrawork.state) &&
       (hasValidSessionId
         ? ultrawork.state.session_id === sessionId
@@ -984,6 +1000,11 @@ async function main() {
         const maxReinforcements = skillState.state.max_reinforcements || 3;
 
         if (count < maxReinforcements) {
+          if (getActiveSubagentCount(stateDir) > 0) {
+            console.log(JSON.stringify({ continue: true, suppressOutput: true }));
+            return;
+          }
+
           const toolError = readLastToolError(stateDir);
           const errorGuidance = getToolErrorRetryGuidance(toolError);
 

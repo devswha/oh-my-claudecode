@@ -188,8 +188,7 @@ export function isOmcStatusLine(statusLine) {
 }
 /**
  * Known OMC hook script filenames installed into .claude/hooks/.
- * Must be kept in sync with getHookScripts() in hooks.ts and
- * HOOKS_SETTINGS_CONFIG_NODE command entries.
+ * Must be kept in sync with HOOKS_SETTINGS_CONFIG_NODE command entries.
  */
 const OMC_HOOK_FILENAMES = new Set([
     'keyword-detector.mjs',
@@ -305,7 +304,7 @@ function directoryHasMarkdownFiles(directory) {
         return false;
     }
 }
-function getInstalledOmcPluginRoots() {
+export function getInstalledOmcPluginRoots() {
     const pluginRoots = new Set();
     const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT?.trim();
     if (pluginRoot) {
@@ -363,6 +362,9 @@ function getPackageDir() {
         // import.meta.url unavailable — last resort
         return process.cwd();
     }
+}
+export function getRuntimePackageRoot() {
+    return getPackageDir();
 }
 /**
  * Load agent definitions from /agents/*.md files
@@ -950,7 +952,7 @@ export function install(options = {}) {
                     log(`  Bootstrapped unified MCP registry: ${mcpSync.result.registryPath}`);
                 }
                 if (mcpSync.result.claudeChanged) {
-                    log(`  Synced ${mcpSync.result.serverNames.length} MCP server(s) into settings.json`);
+                    log(`  Synced ${mcpSync.result.serverNames.length} MCP server(s) into Claude MCP config: ${mcpSync.result.claudeConfigPath}`);
                 }
                 if (mcpSync.result.codexChanged) {
                     log(`  Synced ${mcpSync.result.serverNames.length} MCP server(s) into Codex config: ${mcpSync.result.codexConfigPath}`);

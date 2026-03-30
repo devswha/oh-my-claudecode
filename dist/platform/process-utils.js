@@ -2,7 +2,7 @@
  * Cross-Platform Process Utilities
  * Provides unified process management across Windows, macOS, and Linux.
  */
-import { execSync, execFile } from 'child_process';
+import { execFileSync, execFile } from 'child_process';
 import { promisify } from 'util';
 import * as fsPromises from 'fs/promises';
 const execFileAsync = promisify(execFile);
@@ -28,7 +28,7 @@ async function killProcessTreeWindows(pid, force) {
         if (force) {
             args.unshift('/F');
         }
-        execSync(`taskkill ${args.join(' ')}`, {
+        execFileSync('taskkill.exe', args, {
             stdio: 'ignore',
             timeout: 5000,
             windowsHide: true
@@ -60,6 +60,7 @@ function killProcessTreeUnix(pid, signal) {
 /**
  * Check if a process is alive.
  * Works cross-platform by attempting signal 0.
+ * EPERM means the process exists but we lack permission to signal it.
  */
 export function isProcessAlive(pid) {
     if (!Number.isInteger(pid) || pid <= 0)
@@ -68,7 +69,10 @@ export function isProcessAlive(pid) {
         process.kill(pid, 0);
         return true;
     }
-    catch {
+    catch (e) {
+        if (e && typeof e === 'object' && 'code' in e && e.code === 'EPERM') {
+            return true;
+        }
         return false;
     }
 }

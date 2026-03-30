@@ -8,17 +8,26 @@ import { spawn } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname, parse, join } from 'path';
 import { pathToFileURL } from 'url';
+import { resolveDevContainerContext, hostUriToContainerUri, containerUriToHostUri } from './devcontainer.js';
 import { getServerForFile, commandExists } from './servers.js';
 /** Default timeout (ms) for LSP requests. Override with OMC_LSP_TIMEOUT_MS env var. */
 export const DEFAULT_LSP_REQUEST_TIMEOUT_MS = (() => {
-    const env = process.env.OMC_LSP_TIMEOUT_MS;
-    if (env) {
-        const parsed = parseInt(env, 10);
-        if (!isNaN(parsed) && parsed > 0)
-            return parsed;
-    }
-    return 15_000;
+    return readPositiveIntEnv('OMC_LSP_TIMEOUT_MS', 15_000);
 })();
+export function getLspRequestTimeout(serverConfig, method, baseTimeout = DEFAULT_LSP_REQUEST_TIMEOUT_MS) {
+    if (method === 'initialize' && serverConfig.initializeTimeoutMs) {
+        return Math.max(baseTimeout, serverConfig.initializeTimeoutMs);
+    }
+    return baseTimeout;
+}
+function readPositiveIntEnv(name, fallback) {
+    const env = process.env[name];
+    if (!env) {
+        return fallback;
+    }
+    const parsed = parseInt(env, 10);
+    return !isNaN(parsed) && parsed > 0 ? parsed : fallback;
+}
 /** Convert a file path to a valid file:// URI (cross-platform) */
 function fileUri(filePath) {
     return pathToFileURL(resolve(filePath)).href;
@@ -27,6 +36,7 @@ function fileUri(filePath) {
  * LSP Client class
  */
 export class LspClient {
+    static MAX_BUFFER_SIZE = 50 * 1024 * 1024; // 50MB
     process = null;
     requestId = 0;
     pendingRequests = new Map();
@@ -36,10 +46,12 @@ export class LspClient {
     diagnosticWaiters = new Map();
     workspaceRoot;
     serverConfig;
+    devContainerContext;
     initialized = false;
-    constructor(workspaceRoot, serverConfig) {
+    constructor(workspaceRoot, serverConfig, devContainerContext = null) {
         this.workspaceRoot = resolve(workspaceRoot);
         this.serverConfig = serverConfig;
+        this.devContainerContext = devContainerContext;
     }
     /**
      * Start the LSP server and initialize the connection
@@ -48,17 +60,25 @@ export class LspClient {
         if (this.process) {
             return; // Already connected
         }
-        if (!commandExists(this.serverConfig.command)) {
-            throw new Error(`Language server '${this.serverConfig.command}' not found.\n` +
-                `Install with: ${this.serverConfig.installHint}`);
+        const spawnCommand = this.devContainerContext ? 'docker' : this.serverConfig.command;
+        if (!commandExists(spawnCommand)) {
+            throw new Error(this.devContainerContext
+                ? `Docker CLI not found. Required to start '${this.serverConfig.command}' inside container ${this.devContainerContext.containerId}.`
+                : `Language server '${this.serverConfig.command}' not found.\nInstall with: ${this.serverConfig.installHint}`);
         }
         return new Promise((resolve, reject) => {
-            this.process = spawn(this.serverConfig.command, this.serverConfig.args, {
+            // On Windows, npm-installed binaries are .cmd scripts that require
+            // shell execution. Without this, spawn() fails with ENOENT. (#569)
+            // Safe: server commands come from a hardcoded registry (servers.ts),
+            // not user input, so shell metacharacter injection is not a concern.
+            const command = this.devContainerContext ? 'docker' : this.serverConfig.command;
+            const args = this.devContainerContext
+                ? ['exec', '-i', '-w', this.devContainerContext.containerWorkspaceRoot, this.devContainerContext.containerId, this.serverConfig.command, ...this.serverConfig.args]
+                : this.serverConfig.args;
+            this.process = spawn(command, args, {
                 cwd: this.workspaceRoot,
                 stdio: ['pipe', 'pipe', 'pipe'],
-                // On Windows, npm-installed binaries are .cmd scripts that require
-                // shell execution. Without this, spawn() fails with ENOENT. (#569)
-                shell: process.platform === 'win32'
+                shell: !this.devContainerContext && process.platform === 'win32'
             });
             this.process.stdout?.on('data', (data) => {
                 this.handleData(data);
@@ -111,18 +131,24 @@ export class LspClient {
         if (!this.process)
             return;
         try {
-            await this.request('shutdown', null);
+            // Short timeout for graceful shutdown — don't block forever
+            await this.request('shutdown', null, 3000);
             this.notify('exit', null);
         }
         catch {
             // Ignore errors during shutdown
         }
-        this.process.kill();
-        this.process = null;
-        this.initialized = false;
-        this.rejectPendingRequests(new Error('Client disconnected'));
-        this.openDocuments.clear();
-        this.diagnostics.clear();
+        finally {
+            // Always kill the process regardless of shutdown success
+            if (this.process) {
+                this.process.kill();
+                this.process = null;
+            }
+            this.initialized = false;
+            this.rejectPendingRequests(new Error('Client disconnected'));
+            this.openDocuments.clear();
+            this.diagnostics.clear();
+        }
     }
     /**
      * Reject all pending requests with the given error.
@@ -140,6 +166,13 @@ export class LspClient {
      */
     handleData(data) {
         this.buffer = Buffer.concat([this.buffer, data]);
+        // Prevent unbounded buffer growth from misbehaving LSP server
+        if (this.buffer.length > LspClient.MAX_BUFFER_SIZE) {
+            console.error('[LSP] Response buffer exceeded 50MB limit, resetting');
+            this.buffer = Buffer.alloc(0);
+            this.rejectPendingRequests(new Error('LSP response buffer overflow'));
+            return;
+        }
         while (true) {
             // Look for Content-Length header
             const headerEnd = this.buffer.indexOf('\r\n\r\n');
@@ -197,7 +230,7 @@ export class LspClient {
      */
     handleNotification(notification) {
         if (notification.method === 'textDocument/publishDiagnostics') {
-            const params = notification.params;
+            const params = this.translateIncomingPayload(notification.params);
             this.diagnostics.set(params.uri, params.diagnostics);
             // Wake any waiters registered via waitForDiagnostics()
             const waiters = this.diagnosticWaiters.get(params.uri);
@@ -212,10 +245,11 @@ export class LspClient {
     /**
      * Send a request to the server
      */
-    async request(method, params, timeout = DEFAULT_LSP_REQUEST_TIMEOUT_MS) {
+    async request(method, params, timeout) {
         if (!this.process?.stdin) {
             throw new Error('LSP server not connected');
         }
+        const effectiveTimeout = timeout ?? getLspRequestTimeout(this.serverConfig, method);
         const id = ++this.requestId;
         const request = {
             jsonrpc: '2.0',
@@ -228,8 +262,8 @@ export class LspClient {
         return new Promise((resolve, reject) => {
             const timeoutHandle = setTimeout(() => {
                 this.pendingRequests.delete(id);
-                reject(new Error(`LSP request '${method}' timed out after ${timeout}ms`));
-            }, timeout);
+                reject(new Error(`LSP request '${method}' timed out after ${effectiveTimeout}ms`));
+            }, effectiveTimeout);
             this.pendingRequests.set(id, {
                 resolve: resolve,
                 reject,
@@ -259,8 +293,8 @@ export class LspClient {
     async initialize() {
         await this.request('initialize', {
             processId: process.pid,
-            rootUri: pathToFileURL(this.workspaceRoot).href,
-            rootPath: this.workspaceRoot,
+            rootUri: this.getWorkspaceRootUri(),
+            rootPath: this.getServerWorkspaceRoot(),
             capabilities: {
                 textDocument: {
                     hover: { contentFormat: ['markdown', 'plaintext'] },
@@ -276,15 +310,16 @@ export class LspClient {
                 }
             },
             initializationOptions: this.serverConfig.initializationOptions || {}
-        });
+        }, getLspRequestTimeout(this.serverConfig, 'initialize'));
         this.notify('initialized', {});
     }
     /**
      * Open a document for editing
      */
     async openDocument(filePath) {
-        const uri = fileUri(filePath);
-        if (this.openDocuments.has(uri))
+        const hostUri = fileUri(filePath);
+        const uri = this.toServerUri(hostUri);
+        if (this.openDocuments.has(hostUri))
             return;
         if (!existsSync(filePath)) {
             throw new Error(`File not found: ${filePath}`);
@@ -299,7 +334,7 @@ export class LspClient {
                 text: content
             }
         });
-        this.openDocuments.add(uri);
+        this.openDocuments.add(hostUri);
         // Wait a bit for the server to process the document
         await new Promise(resolve => setTimeout(resolve, 100));
     }
@@ -307,13 +342,14 @@ export class LspClient {
      * Close a document
      */
     closeDocument(filePath) {
-        const uri = fileUri(filePath);
-        if (!this.openDocuments.has(uri))
+        const hostUri = fileUri(filePath);
+        const uri = this.toServerUri(hostUri);
+        if (!this.openDocuments.has(hostUri))
             return;
         this.notify('textDocument/didClose', {
             textDocument: { uri }
         });
-        this.openDocuments.delete(uri);
+        this.openDocuments.delete(hostUri);
     }
     /**
      * Get the language ID for a file
@@ -368,7 +404,7 @@ export class LspClient {
      */
     async prepareDocument(filePath) {
         await this.openDocument(filePath);
-        return fileUri(filePath);
+        return this.toServerUri(fileUri(filePath));
     }
     // LSP Request Methods
     /**
@@ -376,46 +412,51 @@ export class LspClient {
      */
     async hover(filePath, line, character) {
         const uri = await this.prepareDocument(filePath);
-        return this.request('textDocument/hover', {
+        const result = await this.request('textDocument/hover', {
             textDocument: { uri },
             position: { line, character }
         });
+        return this.translateIncomingPayload(result);
     }
     /**
      * Go to definition
      */
     async definition(filePath, line, character) {
         const uri = await this.prepareDocument(filePath);
-        return this.request('textDocument/definition', {
+        const result = await this.request('textDocument/definition', {
             textDocument: { uri },
             position: { line, character }
         });
+        return this.translateIncomingPayload(result);
     }
     /**
      * Find all references
      */
     async references(filePath, line, character, includeDeclaration = true) {
         const uri = await this.prepareDocument(filePath);
-        return this.request('textDocument/references', {
+        const result = await this.request('textDocument/references', {
             textDocument: { uri },
             position: { line, character },
             context: { includeDeclaration }
         });
+        return this.translateIncomingPayload(result);
     }
     /**
      * Get document symbols
      */
     async documentSymbols(filePath) {
         const uri = await this.prepareDocument(filePath);
-        return this.request('textDocument/documentSymbol', {
+        const result = await this.request('textDocument/documentSymbol', {
             textDocument: { uri }
         });
+        return this.translateIncomingPayload(result);
     }
     /**
      * Search workspace symbols
      */
     async workspaceSymbols(query) {
-        return this.request('workspace/symbol', { query });
+        const result = await this.request('workspace/symbol', { query });
+        return this.translateIncomingPayload(result);
     }
     /**
      * Get diagnostics for a file
@@ -480,36 +521,80 @@ export class LspClient {
      */
     async rename(filePath, line, character, newName) {
         const uri = await this.prepareDocument(filePath);
-        return this.request('textDocument/rename', {
+        const result = await this.request('textDocument/rename', {
             textDocument: { uri },
             position: { line, character },
             newName
         });
+        return this.translateIncomingPayload(result);
     }
     /**
      * Get code actions
      */
     async codeActions(filePath, range, diagnostics = []) {
         const uri = await this.prepareDocument(filePath);
-        return this.request('textDocument/codeAction', {
+        const result = await this.request('textDocument/codeAction', {
             textDocument: { uri },
             range,
             context: { diagnostics }
         });
+        return this.translateIncomingPayload(result);
+    }
+    getServerWorkspaceRoot() {
+        return this.devContainerContext?.containerWorkspaceRoot ?? this.workspaceRoot;
+    }
+    getWorkspaceRootUri() {
+        return this.toServerUri(pathToFileURL(this.workspaceRoot).href);
+    }
+    toServerUri(uri) {
+        return hostUriToContainerUri(uri, this.devContainerContext);
+    }
+    toHostUri(uri) {
+        return containerUriToHostUri(uri, this.devContainerContext);
+    }
+    translateIncomingPayload(value) {
+        if (!this.devContainerContext || value == null) {
+            return value;
+        }
+        return this.translateIncomingValue(value);
+    }
+    translateIncomingValue(value) {
+        if (Array.isArray(value)) {
+            return value.map(item => this.translateIncomingValue(item));
+        }
+        if (!value || typeof value !== 'object') {
+            return value;
+        }
+        const record = value;
+        const translatedEntries = Object.entries(record).map(([key, entryValue]) => {
+            if ((key === 'uri' || key === 'targetUri' || key === 'newUri' || key === 'oldUri') && typeof entryValue === 'string') {
+                return [key, this.toHostUri(entryValue)];
+            }
+            if (key === 'changes' && entryValue && typeof entryValue === 'object' && !Array.isArray(entryValue)) {
+                const translatedChanges = Object.fromEntries(Object.entries(entryValue).map(([uri, changeValue]) => [
+                    this.toHostUri(uri),
+                    this.translateIncomingValue(changeValue)
+                ]));
+                return [key, translatedChanges];
+            }
+            return [key, this.translateIncomingValue(entryValue)];
+        });
+        return Object.fromEntries(translatedEntries);
     }
 }
 /** Idle timeout: disconnect LSP clients unused for 5 minutes */
-export const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+export const IDLE_TIMEOUT_MS = readPositiveIntEnv('OMC_LSP_IDLE_TIMEOUT_MS', 5 * 60 * 1000);
 /** Check for idle clients every 60 seconds */
-export const IDLE_CHECK_INTERVAL_MS = 60 * 1000;
+export const IDLE_CHECK_INTERVAL_MS = readPositiveIntEnv('OMC_LSP_IDLE_CHECK_INTERVAL_MS', 60 * 1000);
 /**
  * Client manager - maintains a pool of LSP clients per workspace/server
  * with idle eviction to free resources and in-flight request protection.
  */
-class LspClientManager {
+export class LspClientManager {
     clients = new Map();
     lastUsed = new Map();
     inFlightCount = new Map();
+    idleDeadlines = new Map();
     idleTimer = null;
     constructor() {
         this.startIdleCheck();
@@ -522,6 +607,14 @@ class LspClientManager {
      */
     registerCleanupHandlers() {
         const forceKillAll = () => {
+            if (this.idleTimer) {
+                clearInterval(this.idleTimer);
+                this.idleTimer = null;
+            }
+            for (const timer of this.idleDeadlines.values()) {
+                clearTimeout(timer);
+            }
+            this.idleDeadlines.clear();
             for (const client of this.clients.values()) {
                 try {
                     client.forceKill();
@@ -536,12 +629,10 @@ class LspClientManager {
         };
         // 'exit' handler must be synchronous — forceKill() is sync
         process.on('exit', forceKillAll);
-        // For signals, force-kill all LSP servers then exit
+        // For signals, force-kill LSP servers but do NOT call process.exit()
+        // to allow other signal handlers (e.g., Python bridge cleanup) to run
         for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
-            process.on(sig, () => {
-                forceKillAll();
-                process.exit(0);
-            });
+            process.on(sig, forceKillAll);
         }
     }
     /**
@@ -554,10 +645,11 @@ class LspClientManager {
         }
         // Find workspace root
         const workspaceRoot = this.findWorkspaceRoot(filePath);
-        const key = `${workspaceRoot}:${serverConfig.command}`;
+        const devContainerContext = resolveDevContainerContext(workspaceRoot);
+        const key = `${workspaceRoot}:${serverConfig.command}:${devContainerContext?.containerId ?? 'host'}`;
         let client = this.clients.get(key);
         if (!client) {
-            client = new LspClient(workspaceRoot, serverConfig);
+            client = new LspClient(workspaceRoot, serverConfig, devContainerContext);
             try {
                 await client.connect();
                 this.clients.set(key, client);
@@ -566,8 +658,7 @@ class LspClientManager {
                 throw error;
             }
         }
-        // Track last-used timestamp
-        this.lastUsed.set(key, Date.now());
+        this.touchClient(key);
         return client;
     }
     /**
@@ -581,10 +672,11 @@ class LspClientManager {
             throw new Error(`No language server available for: ${filePath}`);
         }
         const workspaceRoot = this.findWorkspaceRoot(filePath);
-        const key = `${workspaceRoot}:${serverConfig.command}`;
+        const devContainerContext = resolveDevContainerContext(workspaceRoot);
+        const key = `${workspaceRoot}:${serverConfig.command}:${devContainerContext?.containerId ?? 'host'}`;
         let client = this.clients.get(key);
         if (!client) {
-            client = new LspClient(workspaceRoot, serverConfig);
+            client = new LspClient(workspaceRoot, serverConfig, devContainerContext);
             try {
                 await client.connect();
                 this.clients.set(key, client);
@@ -594,7 +686,7 @@ class LspClientManager {
             }
         }
         // Touch timestamp and increment in-flight counter
-        this.lastUsed.set(key, Date.now());
+        this.touchClient(key);
         this.inFlightCount.set(key, (this.inFlightCount.get(key) || 0) + 1);
         try {
             return await fn(client);
@@ -608,8 +700,31 @@ class LspClientManager {
             else {
                 this.inFlightCount.set(key, count);
             }
-            this.lastUsed.set(key, Date.now());
+            this.touchClient(key);
         }
+    }
+    touchClient(key) {
+        this.lastUsed.set(key, Date.now());
+        this.scheduleIdleDeadline(key);
+    }
+    scheduleIdleDeadline(key) {
+        this.clearIdleDeadline(key);
+        const timer = setTimeout(() => {
+            this.idleDeadlines.delete(key);
+            this.evictClientIfIdle(key);
+        }, IDLE_TIMEOUT_MS);
+        if (typeof timer === 'object' && 'unref' in timer) {
+            timer.unref();
+        }
+        this.idleDeadlines.set(key, timer);
+    }
+    clearIdleDeadline(key) {
+        const timer = this.idleDeadlines.get(key);
+        if (!timer) {
+            return;
+        }
+        clearTimeout(timer);
+        this.idleDeadlines.delete(key);
     }
     /**
      * Find the workspace root for a file
@@ -653,23 +768,38 @@ class LspClientManager {
      * Clients with in-flight requests are never evicted.
      */
     evictIdleClients() {
-        const now = Date.now();
-        for (const [key, lastUsedTime] of this.lastUsed.entries()) {
-            if (now - lastUsedTime > IDLE_TIMEOUT_MS) {
-                // Skip eviction if there are in-flight requests
-                if ((this.inFlightCount.get(key) || 0) > 0) {
-                    continue;
-                }
-                const client = this.clients.get(key);
-                if (client) {
-                    client.disconnect().catch(() => {
-                        // Ignore disconnect errors during eviction
-                    });
-                    this.clients.delete(key);
-                    this.lastUsed.delete(key);
-                    this.inFlightCount.delete(key);
-                }
+        for (const key of this.lastUsed.keys()) {
+            this.evictClientIfIdle(key);
+        }
+    }
+    evictClientIfIdle(key) {
+        const lastUsedTime = this.lastUsed.get(key);
+        if (lastUsedTime === undefined) {
+            this.clearIdleDeadline(key);
+            return;
+        }
+        const idleFor = Date.now() - lastUsedTime;
+        if (idleFor <= IDLE_TIMEOUT_MS) {
+            const hasDeadline = this.idleDeadlines.has(key);
+            if (!hasDeadline) {
+                this.scheduleIdleDeadline(key);
             }
+            return;
+        }
+        // Skip eviction if there are in-flight requests
+        if ((this.inFlightCount.get(key) || 0) > 0) {
+            this.scheduleIdleDeadline(key);
+            return;
+        }
+        const client = this.clients.get(key);
+        this.clearIdleDeadline(key);
+        this.clients.delete(key);
+        this.lastUsed.delete(key);
+        this.inFlightCount.delete(key);
+        if (client) {
+            client.disconnect().catch(() => {
+                // Ignore disconnect errors during eviction
+            });
         }
     }
     /**
@@ -682,6 +812,10 @@ class LspClientManager {
             clearInterval(this.idleTimer);
             this.idleTimer = null;
         }
+        for (const timer of this.idleDeadlines.values()) {
+            clearTimeout(timer);
+        }
+        this.idleDeadlines.clear();
         const entries = Array.from(this.clients.entries());
         const results = await Promise.allSettled(entries.map(([, client]) => client.disconnect()));
         // Log any per-client failures at warn level
@@ -710,8 +844,13 @@ class LspClientManager {
         this.evictIdleClients();
     }
 }
-// Export a singleton instance
-export const lspClientManager = new LspClientManager();
+const LSP_CLIENT_MANAGER_KEY = '__omcLspClientManager';
+// Export a process-global singleton instance. This protects against duplicate
+// manager instances if the module is loaded more than once in the same process
+// (for example after module resets in tests or bundle indirection).
+const globalWithLspClientManager = globalThis;
+export const lspClientManager = globalWithLspClientManager[LSP_CLIENT_MANAGER_KEY]
+    ?? (globalWithLspClientManager[LSP_CLIENT_MANAGER_KEY] = new LspClientManager());
 /**
  * Disconnect all LSP clients and free resources.
  * Exported for use in session-end hooks.

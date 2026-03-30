@@ -168,7 +168,7 @@ The `plugin.json` defines the plugin's metadata and tools:
 
 ### Skill and Agent Discovery
 
-**Skills** are discovered from `SKILL.md` files in the skills directory. Each skill directory must contain a SKILL.md with frontmatter:
+**Skills** are discovered from `SKILL.md` files in the skills directory. OMC's canonical project-local write target remains `.omc/skills/`, and it now also reads project-local compatibility skills from `.agents/skills/`. Each skill directory must contain a SKILL.md with frontmatter:
 
 ```markdown
 ---

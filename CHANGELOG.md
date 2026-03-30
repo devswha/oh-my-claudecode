@@ -1,24 +1,48 @@
-# oh-my-claudecode v4.8.2: Major Hotfixes
+# oh-my-claudecode v4.9.0: Team reliability, autoresearch setup, and safety hardening
 
 ## Release Notes
 
-Hotfix release addressing **CCG skill nesting**, **team runtime enhancements**, **ralph/ralplan hook reliability**, **dead code cleanup**, and **deep-interview convergence tracking**.
+Release 4.9.0 focuses on **team/runtime reliability**, **autoresearch onboarding and launch flow improvements**, and **safety hardening** across keyword/regex-sensitive paths and background process cleanup.
 
-### Hotfixes
+### Highlights
 
-- **fix(ccg): use CLI-first path for ask advisors** — Skill nesting is unsupported in Claude Code; CCG now routes advisor calls through the CLI path instead. (#1662)
-- **fix(hooks): fix ralph/ralplan stop hook not auto-continuing** — Stop hooks now correctly resume ralph/ralplan iterations instead of halting. (#1660)
-- **fix: remove dead code from deprecated features** — Cleaned up unused code paths from previously deprecated functionality. (#1659)
+- **feat(team): harden shutdown cleanup for split-pane workers** — strengthens cleanup when pane metadata drifts and improves cmux-compatible team launches. (#1752, #1750, #1743)
+- **feat(autoresearch): improve setup and launch flow** — adds guided intake, launch-from-interview artifacts, and zero-learning-curve Claude session setup. (#1740, #1734, #1723, #1693)
+- **fix(safety): harden regex- and state-sensitive paths** — filters informational keyword-detector queries, avoids risky regex behavior, and reduces stale state interactions. (#1737, #1741)
+- **fix(runtime): clean up orphaned background processes** — reduces lingering bridge/MCP child processes and related runtime residue. (#1724)
 
-### Enhancements
+### Team & Runtime Reliability
 
-- **feat(team): backport 6 OMX team runtime enhancements** — Brings team worker stability, mailbox handling, shell affinity, and allocation improvements from OMX upstream. (#1658, #1540)
-- **feat(deep-interview): add ontology convergence tracking** — Inspired by Q00/ouroboros, adds mathematical convergence metrics to deep-interview sessions. (#1657)
+- **fix(team): ensure shutdown removes split-pane workers after metadata drift** — improves team shutdown cleanup reliability. (#1752)
+- **fix(team): support team mode launches from cmux surfaces** — expands compatibility for cmux-driven flows. (#1750)
+- **fix(cli): skip tmux wrapping in cmux terminals** — prevents orphaned/incorrect nested session behavior. (#1743)
+- **fix(bridge): clean up orphaned bridge and MCP child processes** — hardens runtime cleanup behavior. (#1724)
+
+### Autoresearch Improvements
+
+- **feat(autoresearch): launch from interview artifacts** — enables smoother launch flow from planning artifacts. (#1740)
+- **fix(autoresearch): port intake flow from OMX and clean up setup path** — improves guided intake reliability. (#1734)
+- **feat: add zero-learning-curve autoresearch setup flow** — simplifies Claude session setup for lightweight use. (#1723)
+- **feat(autoresearch): backport autoresearch from OMX to OMC (Phase 1)** — expands the autoresearch surface. (#1693)
+
+### Safety & Correctness
+
+- **fix(keyword-detector): skip informational queries and clear legacy state** — reduces false activations and stale-state issues. (#1737)
+- **fix: prevent skill-active-state collision between OMC and project custom skills** — improves reload/sync safety around active state handling. (#1741)
+- **fix(planning): remove unnecessary global flag from module-level regex** — avoids unsafe regex statefulness in planning-related flows.
+- **fix(team): pass Bedrock/Vertex model IDs to workers without normalization** — preserves provider-specific identifiers. (#1697)
+
+### Workflow & Platform
+
+- **feat: add mandatory deslop pass to ralph workflow** — improves cleanup discipline in execution flows. (#1736)
+- **feat(docs): add Lore commit knowledge protocol to CLAUDE.md template** — formalizes commit knowledge capture. (#1733)
+- **feat(deepinit): add manifest-based incremental deepinit tool** — extends onboarding/setup capabilities. (#1719)
+- **feat(skill): add deep-dive skill (trace -> deep-interview pipeline)** — adds a new investigation workflow. (#1681)
 
 ### Install / Update
 
 ```bash
-npm install -g oh-my-claude-sisyphus@4.8.2
+npm install -g oh-my-claude-sisyphus@4.9.0
 ```
 
 Or reinstall the plugin:
@@ -27,4 +51,4 @@ Or reinstall the plugin:
 claude /install-plugin oh-my-claudecode
 ```
 
-**Full Changelog**: https://github.com/Yeachan-Heo/oh-my-claudecode/compare/v4.8.1...v4.8.2
+**Full Changelog**: https://github.com/Yeachan-Heo/oh-my-claudecode/compare/v4.8.2...v4.9.0

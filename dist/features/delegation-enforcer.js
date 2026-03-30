@@ -27,6 +27,10 @@ export function normalizeToCcAlias(model) {
     const family = resolveClaudeFamily(model);
     return family ? (FAMILY_TO_ALIAS[family] ?? model) : model;
 }
+function isDelegationToolName(toolName) {
+    const normalizedToolName = toolName.toLowerCase();
+    return normalizedToolName === 'agent' || normalizedToolName === 'task';
+}
 function canonicalizeSubagentType(subagentType) {
     const hasPrefix = subagentType.startsWith('oh-my-claudecode:');
     const rawAgentType = subagentType.replace(/^oh-my-claudecode:/, '');
@@ -132,7 +136,7 @@ export function enforceModel(agentInput) {
  * Check if tool input is an agent delegation call
  */
 export function isAgentCall(toolName, toolInput) {
-    if (toolName !== 'Agent' && toolName !== 'Task') {
+    if (!isDelegationToolName(toolName)) {
         return false;
     }
     if (!toolInput || typeof toolInput !== 'object') {

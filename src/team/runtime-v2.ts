@@ -58,6 +58,7 @@ import type { CliAgentType } from './model-contract.js';
 import {
   buildWorkerArgv, resolveValidatedBinaryPath,
   getWorkerEnv as getModelWorkerEnv, isPromptModeAgent, getPromptModeArgs,
+  resolveClaudeWorkerModel,
 } from './model-contract.js';
 import {
   createTeamSession, spawnWorkerInPane, sendToWorker,
@@ -71,6 +72,7 @@ import {
 } from './worker-bootstrap.js';
 import { queueInboxInstruction, type DispatchOutcome } from './mcp-comm.js';
 import { cleanupTeamWorktrees } from './git-worktree.js';
+import { formatOmcCliInvocation } from '../utils/omc-cli-rendering.js';
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -240,18 +242,28 @@ function buildV2TaskInstruction(
   task: { subject: string; description: string },
   taskId: string,
 ): string {
+  const claimTaskCommand = formatOmcCliInvocation(
+    `team api claim-task --input '${JSON.stringify({ team_name: teamName, task_id: taskId, worker: workerName })}' --json`,
+    {},
+  );
+  const completeTaskCommand = formatOmcCliInvocation(
+    `team api transition-task-status --input '${JSON.stringify({ team_name: teamName, task_id: taskId, from: 'in_progress', to: 'completed', claim_token: '<claim_token>' })}' --json`,
+  );
+  const failTaskCommand = formatOmcCliInvocation(
+    `team api transition-task-status --input '${JSON.stringify({ team_name: teamName, task_id: taskId, from: 'in_progress', to: 'failed', claim_token: '<claim_token>' })}' --json`,
+  );
   return [
     `## REQUIRED: Task Lifecycle Commands`,
     `You MUST run these commands. Do NOT skip any step.`,
     ``,
     `1. Claim your task:`,
-    `   omc team api claim-task --input '{"team_name":"${teamName}","task_id":"${taskId}","worker":"${workerName}"}' --json`,
+    `   ${claimTaskCommand}`,
     `   Save the claim_token from the response.`,
     `2. Do the work described below.`,
     `3. On completion (use claim_token from step 1):`,
-    `   omc team api transition-task-status --input '{"team_name":"${teamName}","task_id":"${taskId}","from":"in_progress","to":"completed","claim_token":"<claim_token>"}' --json`,
+    `   ${completeTaskCommand}`,
     `4. On failure (use claim_token from step 1):`,
-    `   omc team api transition-task-status --input '{"team_name":"${teamName}","task_id":"${taskId}","from":"in_progress","to":"failed","claim_token":"<claim_token>"}' --json`,
+    `   ${failTaskCommand}`,
     `5. ACK/progress replies are not a stop signal. Keep executing your assigned or next feasible work until the task is actually complete or failed, then transition and exit.`,
     ``,
     `## Task Assignment`,
@@ -416,7 +428,9 @@ async function spawnV2Worker(opts: SpawnV2WorkerOptions): Promise<SpawnV2WorkerR
   const resolvedBinaryPath = opts.resolvedBinaryPaths[opts.agentType]
     ?? resolveValidatedBinaryPath(opts.agentType);
 
-  // Resolve model from environment variables
+  // Resolve model from environment variables.
+  // For Claude agents on Bedrock/Vertex, resolve the provider-specific model
+  // so workers don't fall back to invalid Anthropic API model names. (#1695)
   const modelForAgent = (() => {
     if (opts.agentType === 'codex') {
       return process.env.OMC_EXTERNAL_MODELS_DEFAULT_CODEX_MODEL
@@ -428,7 +442,8 @@ async function spawnV2Worker(opts: SpawnV2WorkerOptions): Promise<SpawnV2WorkerR
         || process.env.OMC_GEMINI_DEFAULT_MODEL
         || undefined;
     }
-    return undefined;
+    // Claude agents: resolve Bedrock/Vertex model when on those providers
+    return resolveClaudeWorkerModel();
   })();
 
   const [launchBinary, ...launchArgs] = buildWorkerArgv(opts.agentType, {
@@ -1234,11 +1249,18 @@ export async function shutdownTeamV2(
 
   // 4. Force kill remaining tmux panes
   try {
-    const { killWorkerPanes, killTeamSession } = await import('./tmux-session.js');
-    const workerPaneIds = config.workers
+    const { killWorkerPanes, killTeamSession, resolveSplitPaneWorkerPaneIds } = await import('./tmux-session.js');
+    const recordedWorkerPaneIds = config.workers
       .map((w) => w.pane_id)
       .filter((p): p is string => typeof p === 'string' && p.trim().length > 0);
     const ownsWindow = config.tmux_window_owned === true;
+    const workerPaneIds = ownsWindow
+      ? recordedWorkerPaneIds
+      : await resolveSplitPaneWorkerPaneIds(
+        config.tmux_session,
+        recordedWorkerPaneIds,
+        config.leader_pane_id ?? undefined,
+      );
     await killWorkerPanes({
       paneIds: workerPaneIds,
       leaderPaneId: config.leader_pane_id ?? undefined,

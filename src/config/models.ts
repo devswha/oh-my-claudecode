@@ -191,6 +191,60 @@ export function isBedrock(): boolean {
 }
 
 /**
+ * Check whether a model ID is a provider-specific identifier that should NOT
+ * be normalized to a bare alias (sonnet/opus/haiku).
+ *
+ * Provider-specific IDs include:
+ *   - Bedrock prefixed: us.anthropic.claude-*, global.anthropic.claude-*, anthropic.claude-*
+ *   - Bedrock ARN: arn:aws:bedrock:...
+ *   - Vertex AI: vertex_ai/...
+ *
+ * These IDs must be passed through to the CLI as-is because normalizing them
+ * to aliases like "sonnet" causes Claude Code to expand them to Anthropic API
+ * model names (e.g. claude-sonnet-4-6) which are invalid on Bedrock/Vertex.
+ */
+export function isProviderSpecificModelId(modelId: string): boolean {
+  // Bedrock prefixed formats (region.anthropic.claude-*, anthropic.claude-*)
+  if (/^((us|eu|ap|global)\.anthropic\.|anthropic\.claude)/i.test(modelId)) {
+    return true;
+  }
+  // Bedrock ARN formats
+  if (/^arn:aws(-[^:]+)?:bedrock:/i.test(modelId)) {
+    return true;
+  }
+  // Vertex AI prefixed format
+  if (modelId.toLowerCase().startsWith('vertex_ai/')) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Detect whether a model ID has a Claude Code extended-context window suffix
+ * (e.g., `[1m]`, `[200k]`) that is NOT a valid Bedrock API identifier.
+ *
+ * The `[1m]` suffix is a Claude Code internal annotation for the 1M context
+ * window variant. It is valid for the parent session's API path but is
+ * rejected by the sub-agent spawning runtime, which strips it to a bare
+ * Anthropic model ID (e.g., `claude-sonnet-4-6`) that is invalid on Bedrock.
+ */
+export function hasExtendedContextSuffix(modelId: string): boolean {
+  return /\[\d+[mk]\]$/i.test(modelId);
+}
+
+/**
+ * Check whether a model ID is safe to pass as the `model` parameter when
+ * spawning sub-agents on non-standard providers (Bedrock, Vertex AI).
+ *
+ * A model ID is sub-agent safe if it is provider-specific (full Bedrock or
+ * Vertex AI format) AND does not carry a Claude Code context-window suffix
+ * like `[1m]` that the sub-agent runtime cannot handle.
+ */
+export function isSubagentSafeModelId(modelId: string): boolean {
+  return isProviderSpecificModelId(modelId) && !hasExtendedContextSuffix(modelId);
+}
+
+/**
  * Detect whether Claude Code is running on Google Vertex AI.
  *
  * Claude Code sets CLAUDE_CODE_USE_VERTEX=1 when configured for Vertex AI.

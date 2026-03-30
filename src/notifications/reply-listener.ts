@@ -37,6 +37,7 @@ import {
 import type { ReplyConfig } from './types.js';
 import { parseMentionAllowedMentions } from './config.js';
 import { redactTokens } from './redact.js';
+import { isProcessAlive } from '../platform/index.js';
 import {
   validateSlackMessage,
   SlackConnectionStateTracker,
@@ -276,18 +277,6 @@ function removePidFile(): void {
 }
 
 /**
- * Check if a process is running
- */
-function isProcessRunning(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Check if daemon is currently running
  */
 export function isDaemonRunning(): boolean {
@@ -296,7 +285,7 @@ export function isDaemonRunning(): boolean {
     return false;
   }
 
-  if (!isProcessRunning(pid)) {
+  if (!isProcessAlive(pid)) {
     removePidFile();
     return false;
   }
@@ -1008,7 +997,7 @@ export function stopReplyListener(): DaemonResponse {
     };
   }
 
-  if (!isProcessRunning(pid)) {
+  if (!isProcessAlive(pid)) {
     removePidFile();
     return {
       success: true,

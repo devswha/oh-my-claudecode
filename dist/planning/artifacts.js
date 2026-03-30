@@ -52,8 +52,8 @@ export function isPlanningComplete(artifacts) {
  *   omc team 2:codex "fix the bug" --linked-ralph
  *   omc ralph "do the work"
  */
-const TEAM_LAUNCH_RE = /\bomc\s+team\s+(?:(\d+):(\w+)\s+)?"([^"]+)"((?:\s+--[\w-]+)*)/g;
-const RALPH_LAUNCH_RE = /\bomc\s+ralph\s+"([^"]+)"((?:\s+--[\w-]+)*)/g;
+const TEAM_LAUNCH_RE = /\bomc\s+team\s+(?:(\d+):(\w+)\s+)?"([^"]+)"((?:\s+--[\w-]+)*)/;
+const RALPH_LAUNCH_RE = /\bomc\s+ralph\s+"([^"]+)"((?:\s+--[\w-]+)*)/;
 function parseFlags(flagStr) {
     return {
         linkedRalph: /--linked-ralph/.test(flagStr),
@@ -77,7 +77,6 @@ export function readApprovedExecutionLaunchHint(cwd, mode) {
         return null;
     }
     if (mode === 'team') {
-        TEAM_LAUNCH_RE.lastIndex = 0;
         const match = TEAM_LAUNCH_RE.exec(content);
         if (!match)
             return null;
@@ -94,7 +93,6 @@ export function readApprovedExecutionLaunchHint(cwd, mode) {
         };
     }
     if (mode === 'ralph') {
-        RALPH_LAUNCH_RE.lastIndex = 0;
         const match = RALPH_LAUNCH_RE.exec(content);
         if (!match)
             return null;

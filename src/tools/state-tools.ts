@@ -149,6 +149,47 @@ function getStatePath(mode: StateToolMode, root: string): string {
   return resolveStatePath(mode, root);
 }
 
+function getLegacyStateFileCandidates(mode: StateToolMode, root: string): string[] {
+  const normalizedName = mode.endsWith('-state') ? mode : `${mode}-state`;
+  const candidates = [
+    getStatePath(mode, root),
+    join(getOmcRoot(root), `${normalizedName}.json`),
+  ];
+
+  return [...new Set(candidates)];
+}
+
+function clearLegacyStateCandidates(
+  mode: StateToolMode,
+  root: string,
+  sessionId?: string,
+): { cleared: number; hadFailure: boolean } {
+  let cleared = 0;
+  let hadFailure = false;
+
+  for (const legacyPath of getLegacyStateFileCandidates(mode, root)) {
+    if (!existsSync(legacyPath)) {
+      continue;
+    }
+
+    try {
+      if (sessionId) {
+        const raw = JSON.parse(readFileSync(legacyPath, 'utf-8')) as Record<string, unknown>;
+        if (!canClearStateForSession(raw, sessionId)) {
+          continue;
+        }
+      }
+
+      unlinkSync(legacyPath);
+      cleared++;
+    } catch {
+      hadFailure = true;
+    }
+  }
+
+  return { cleared, hadFailure };
+}
+
 // ============================================================================
 // state_read - Read state for a mode
 // ============================================================================
@@ -160,6 +201,7 @@ export const stateReadTool: ToolDefinition<{
 }> = {
   name: 'state_read',
   description: 'Read the current state for a specific mode (ralph, ultrawork, autopilot, etc.). Returns the JSON state data or indicates if no state exists.',
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   schema: {
     mode: z.enum(STATE_TOOL_MODES).describe('The mode to read state for'),
     workingDirectory: z.string().optional().describe('Working directory (defaults to cwd)'),
@@ -294,6 +336,7 @@ export const stateWriteTool: ToolDefinition<{
 }> = {
   name: 'state_write',
   description: 'Write/update state for a specific mode. Creates the state file and directories if they do not exist. Common fields (active, iteration, phase, etc.) can be set directly as parameters. Additional custom fields can be passed via the optional `state` parameter. Note: swarm uses SQLite and cannot be written via this tool.',
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   schema: {
     mode: z.enum(STATE_TOOL_MODES).describe('The mode to write state for'),
     active: z.boolean().optional().describe('Whether the mode is currently active'),
@@ -424,6 +467,7 @@ export const stateClearTool: ToolDefinition<{
 }> = {
   name: 'state_clear',
   description: 'Clear/delete state for a specific mode. Removes the state file and any associated marker files.',
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   schema: {
     mode: z.enum(STATE_TOOL_MODES).describe('The mode to clear state for'),
     workingDirectory: z.string().optional().describe('Working directory (defaults to cwd)'),
@@ -461,25 +505,9 @@ export const stateClearTool: ToolDefinition<{
 
         if (MODE_CONFIGS[mode as ExecutionMode]) {
           const success = clearModeState(mode as ExecutionMode, root, sessionId);
+          const legacyCleanup = clearLegacyStateCandidates(mode, root, sessionId);
 
-          // Ghost-legacy cleanup: after clearing session file, also remove
-          // any legacy file at .omc/state/{mode}-state.json if it belongs
-          // to this session (matching _meta.sessionId) or has no _meta block.
-          let ghostCleaned = false;
-          try {
-            const legacyPath = getStateFilePath(root, mode as ExecutionMode);
-            if (existsSync(legacyPath)) {
-              const raw = JSON.parse(readFileSync(legacyPath, 'utf-8')) as Record<string, unknown>;
-              if (canClearStateForSession(raw, sessionId)) {
-                unlinkSync(legacyPath);
-                ghostCleaned = true;
-              }
-            }
-          } catch {
-            // Best-effort ghost cleanup — ignore errors
-          }
-
-          const ghostNote = ghostCleaned ? ' (ghost legacy file also removed)' : '';
+          const ghostNote = legacyCleanup.cleared > 0 ? ' (ghost legacy file also removed)' : '';
           const runtimeCleanupNote = (() => {
             if (mode !== 'team') return '';
             const teamNames = [...cleanedTeamNames];
@@ -490,7 +518,7 @@ export const stateClearTool: ToolDefinition<{
             if (prunedMissions > 0) details.push(`pruned ${prunedMissions} HUD mission entry(ies)`);
             return details.length > 0 ? ` (${details.join(', ')})` : '';
           })();
-          if (success) {
+          if (success && !legacyCleanup.hadFailure) {
             return {
               content: [{
                 type: 'text' as const,
@@ -513,22 +541,9 @@ export const stateClearTool: ToolDefinition<{
           unlinkSync(statePath);
         }
 
-        // Ghost-legacy cleanup for non-registry modes
-        let ghostCleaned = false;
-        try {
-          const legacyPath = resolveStatePath(mode, root);
-          if (existsSync(legacyPath)) {
-            const raw = JSON.parse(readFileSync(legacyPath, 'utf-8')) as Record<string, unknown>;
-            if (canClearStateForSession(raw, sessionId)) {
-              unlinkSync(legacyPath);
-              ghostCleaned = true;
-            }
-          }
-        } catch {
-          // Best-effort ghost cleanup
-        }
+        const legacyCleanup = clearLegacyStateCandidates(mode, root, sessionId);
 
-        const ghostNote = ghostCleaned ? ' (ghost legacy file also removed)' : '';
+        const ghostNote = legacyCleanup.cleared > 0 ? ' (ghost legacy file also removed)' : '';
         const runtimeCleanupNote = (() => {
           if (mode !== 'team') return '';
           const teamNames = [...cleanedTeamNames];
@@ -542,7 +557,7 @@ export const stateClearTool: ToolDefinition<{
         return {
           content: [{
             type: 'text' as const,
-            text: `Successfully cleared state for mode: ${mode} in session: ${sessionId}${ghostNote}${runtimeCleanupNote}`
+            text: `${legacyCleanup.hadFailure ? 'Warning: Some files could not be removed' : 'Successfully cleared state'} for mode: ${mode} in session: ${sessionId}${ghostNote}${runtimeCleanupNote}`
           }]
         };
       }
@@ -556,25 +571,20 @@ export const stateClearTool: ToolDefinition<{
 
       // Clear legacy path
       if (MODE_CONFIGS[mode as ExecutionMode]) {
-        // Only clear if state file exists - avoid false counts for missing files
-        const legacyStatePath = getStateFilePath(root, mode as ExecutionMode);
-        if (existsSync(legacyStatePath)) {
+        const primaryLegacyStatePath = getStateFilePath(root, mode as ExecutionMode);
+        if (existsSync(primaryLegacyStatePath)) {
           if (clearModeState(mode as ExecutionMode, root)) {
             clearedCount++;
           } else {
             errors.push('legacy path');
           }
         }
-      } else {
-        const statePath = getStatePath(mode, root);
-        if (existsSync(statePath)) {
-          try {
-            unlinkSync(statePath);
-            clearedCount++;
-          } catch {
-            errors.push('legacy path');
-          }
-        }
+      }
+
+      const extraLegacyCleanup = clearLegacyStateCandidates(mode, root);
+      clearedCount += extraLegacyCleanup.cleared;
+      if (extraLegacyCleanup.hadFailure) {
+        errors.push('legacy path');
       }
 
       // Clear all session-scoped state files
@@ -666,6 +676,7 @@ export const stateListActiveTool: ToolDefinition<{
 }> = {
   name: 'state_list_active',
   description: 'List all currently active modes. Returns which modes have active state files.',
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   schema: {
     workingDirectory: z.string().optional().describe('Working directory (defaults to cwd)'),
     session_id: z.string().optional().describe('Session ID for session-scoped state isolation. When provided, the tool operates only within that session. When omitted, the tool aggregates legacy state plus all session-scoped state (may include other sessions).'),
@@ -816,6 +827,7 @@ export const stateGetStatusTool: ToolDefinition<{
 }> = {
   name: 'state_get_status',
   description: 'Get detailed status for a specific mode or all modes. Shows active status, file paths, and state contents.',
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   schema: {
     mode: z.enum(STATE_TOOL_MODES).optional().describe('Specific mode to check (omit for all modes)'),
     workingDirectory: z.string().optional().describe('Working directory (defaults to cwd)'),

@@ -7,6 +7,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { getWorktreeRoot } from '../lib/worktree-paths.js';
+const TRANSIENT_CONTEXT_PERCENT_TOLERANCE = 3;
 // ============================================================================
 // Stdin Cache (for --watch mode)
 // ============================================================================
@@ -84,23 +85,65 @@ function getTotalTokens(stdin) {
         (usage?.cache_creation_input_tokens ?? 0) +
         (usage?.cache_read_input_tokens ?? 0));
 }
+function getRoundedNativeContextPercent(stdin) {
+    const nativePercent = stdin?.context_window?.used_percentage;
+    if (typeof nativePercent !== 'number' || Number.isNaN(nativePercent)) {
+        return null;
+    }
+    return Math.min(100, Math.max(0, Math.round(nativePercent)));
+}
+function getManualContextPercent(stdin) {
+    const size = stdin.context_window?.context_window_size;
+    if (!size || size <= 0) {
+        return null;
+    }
+    const totalTokens = getTotalTokens(stdin);
+    return Math.min(100, Math.round((totalTokens / size) * 100));
+}
+function isSameContextStream(current, previous) {
+    return current.cwd === previous.cwd
+        && current.transcript_path === previous.transcript_path
+        && current.context_window?.context_window_size === previous.context_window?.context_window_size;
+}
+/**
+ * Preserve the last native context percentage across transient snapshots where Claude Code
+ * omits `used_percentage`, but only when the fallback calculation is close enough to suggest
+ * the same underlying value rather than a real context jump.
+ */
+export function stabilizeContextPercent(stdin, previousStdin) {
+    if (getRoundedNativeContextPercent(stdin) !== null) {
+        return stdin;
+    }
+    if (!previousStdin || !isSameContextStream(stdin, previousStdin)) {
+        return stdin;
+    }
+    const previousNativePercent = getRoundedNativeContextPercent(previousStdin);
+    if (previousNativePercent === null) {
+        return stdin;
+    }
+    const manualPercent = getManualContextPercent(stdin);
+    if (manualPercent !== null
+        && Math.abs(manualPercent - previousNativePercent) > TRANSIENT_CONTEXT_PERCENT_TOLERANCE) {
+        return stdin;
+    }
+    return {
+        ...stdin,
+        context_window: {
+            ...stdin.context_window,
+            used_percentage: previousStdin.context_window.used_percentage ?? previousNativePercent,
+        },
+    };
+}
 /**
  * Get context window usage percentage.
  * Prefers native percentage from Claude Code v2.1.6+, falls back to manual calculation.
  */
 export function getContextPercent(stdin) {
-    // Prefer native percentage (v2.1.6+) - accurate and matches /context
-    const nativePercent = stdin.context_window?.used_percentage;
-    if (typeof nativePercent === 'number' && !Number.isNaN(nativePercent)) {
-        return Math.min(100, Math.max(0, Math.round(nativePercent)));
+    const nativePercent = getRoundedNativeContextPercent(stdin);
+    if (nativePercent !== null) {
+        return nativePercent;
     }
-    // Fallback: manual calculation
-    const size = stdin.context_window?.context_window_size;
-    if (!size || size <= 0) {
-        return 0;
-    }
-    const totalTokens = getTotalTokens(stdin);
-    return Math.min(100, Math.round((totalTokens / size) * 100));
+    return getManualContextPercent(stdin) ?? 0;
 }
 /**
  * Get model display name from stdin.

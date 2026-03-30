@@ -21,6 +21,7 @@ import {
 } from "fs";
 import * as path from "path";
 import { ensureDirSync } from "./atomic-write.js";
+import { isProcessAlive } from "../platform/index.js";
 
 // ============================================================================
 // Types
@@ -54,28 +55,6 @@ const DEFAULT_RETRY_DELAY_MS = 50;
 // ============================================================================
 
 /**
- * Check if a process with the given PID is alive.
- * Returns false for invalid PIDs or if kill(pid, 0) throws ESRCH.
- */
-function isPidAlive(pid: number): boolean {
-  if (pid <= 0 || !Number.isFinite(pid)) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (e: unknown) {
-    // EPERM means the process exists but we lack permission -- still alive
-    if (
-      e &&
-      typeof e === "object" &&
-      "code" in e &&
-      (e as { code: string }).code === "EPERM"
-    )
-      return true;
-    return false;
-  }
-}
-
-/**
  * Check if an existing lock file is stale.
  * A lock is stale if older than staleLockMs AND the owning PID is dead.
  */
@@ -89,7 +68,7 @@ function isLockStale(lockPath: string, staleLockMs: number): boolean {
     try {
       const raw = readFileSync(lockPath, "utf-8");
       const payload = JSON.parse(raw) as { pid?: number };
-      if (payload.pid && isPidAlive(payload.pid)) return false;
+      if (payload.pid && isProcessAlive(payload.pid)) return false;
     } catch {
       // Malformed or unreadable -- treat as stale if old enough
     }

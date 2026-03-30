@@ -24,6 +24,7 @@ import {
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
+import { isProcessAlive } from '../platform/index.js';
 
 // ============================================================================
 // Constants
@@ -108,23 +109,6 @@ function ensureRegistryDir(): void {
  */
 function sleepMs(ms: number): void {
   Atomics.wait(SLEEP_ARRAY, 0, 0, ms);
-}
-
-/**
- * Check whether a process is alive.
- * EPERM indicates a live process we can't signal.
- */
-function isPidAlive(pid: number): boolean {
-  if (!Number.isFinite(pid) || pid <= 0) {
-    return false;
-  }
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    const err = error as NodeJS.ErrnoException;
-    return err.code === 'EPERM';
-  }
 }
 
 /**
@@ -224,7 +208,7 @@ function acquireRegistryLock(): RegistryLockHandle | null {
           }
 
           // Never reap an active lock held by a live process.
-          if (snapshot.pid !== null && isPidAlive(snapshot.pid)) {
+          if (snapshot.pid !== null && isProcessAlive(snapshot.pid)) {
             sleepMs(LOCK_RETRY_MS);
             continue;
           }

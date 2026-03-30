@@ -51,12 +51,14 @@ describe('doctor-conflicts: hook ownership classification', () => {
     mkdirSync(TEST_CLAUDE_DIR, { recursive: true });
     mkdirSync(TEST_PROJECT_CLAUDE_DIR, { recursive: true });
     process.env.CLAUDE_CONFIG_DIR = TEST_CLAUDE_DIR;
+    process.env.CLAUDE_MCP_CONFIG_PATH = join(TEST_CLAUDE_DIR, '..', '.claude.json');
     cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(TEST_PROJECT_DIR);
   });
 
   afterEach(() => {
     cwdSpy.mockRestore();
     delete process.env.CLAUDE_CONFIG_DIR;
+    delete process.env.CLAUDE_MCP_CONFIG_PATH;
     delete process.env.OMC_HOME;
     delete process.env.CODEX_HOME;
     for (const dir of [TEST_CLAUDE_DIR, TEST_PROJECT_DIR]) {
@@ -190,7 +192,7 @@ describe('doctor-conflicts: hook ownership classification', () => {
     writeFileSync(join(registryDir, 'mcp-registry.json'), JSON.stringify({
       gitnexus: { command: 'gitnexus', args: ['mcp'] },
     }));
-    writeFileSync(join(TEST_CLAUDE_DIR, 'settings.json'), JSON.stringify({
+    writeFileSync(process.env.CLAUDE_MCP_CONFIG_PATH!, JSON.stringify({
       mcpServers: {
         gitnexus: { command: 'gitnexus', args: ['mcp'] },
       },
@@ -220,7 +222,7 @@ describe('doctor-conflicts: hook ownership classification', () => {
     writeFileSync(join(registryDir, 'mcp-registry.json'), JSON.stringify({
       gitnexus: { command: 'gitnexus', args: ['mcp'] },
     }));
-    writeFileSync(join(TEST_CLAUDE_DIR, 'settings.json'), JSON.stringify({
+    writeFileSync(process.env.CLAUDE_MCP_CONFIG_PATH!, JSON.stringify({
       mcpServers: {
         gitnexus: { command: 'gitnexus', args: ['mcp'] },
       },
@@ -361,12 +363,14 @@ describe('doctor-conflicts: CLAUDE.md companion file detection (issue #1101)', (
     mkdirSync(TEST_CLAUDE_DIR, { recursive: true });
     mkdirSync(TEST_PROJECT_CLAUDE_DIR, { recursive: true });
     process.env.CLAUDE_CONFIG_DIR = TEST_CLAUDE_DIR;
+    process.env.CLAUDE_MCP_CONFIG_PATH = join(TEST_CLAUDE_DIR, '..', '.claude.json');
     cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(TEST_PROJECT_DIR);
   });
 
   afterEach(() => {
     cwdSpy.mockRestore();
     delete process.env.CLAUDE_CONFIG_DIR;
+    delete process.env.CLAUDE_MCP_CONFIG_PATH;
     delete process.env.OMC_HOME;
     delete process.env.CODEX_HOME;
     for (const dir of [TEST_CLAUDE_DIR, TEST_PROJECT_DIR]) {
@@ -523,6 +527,7 @@ describe('doctor-conflicts: config known fields (issue #1499)', () => {
     mkdirSync(join(TEST_PROJECT_DIR, '.omc'), { recursive: true });
     mkdirSync(join(TEST_PROJECT_DIR, '.codex'), { recursive: true });
     process.env.CLAUDE_CONFIG_DIR = TEST_CLAUDE_DIR;
+    process.env.CLAUDE_MCP_CONFIG_PATH = join(TEST_CLAUDE_DIR, '..', '.claude.json');
     process.env.OMC_HOME = join(TEST_PROJECT_DIR, '.omc');
     process.env.CODEX_HOME = join(TEST_PROJECT_DIR, '.codex');
     cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue(TEST_PROJECT_DIR);
@@ -531,6 +536,7 @@ describe('doctor-conflicts: config known fields (issue #1499)', () => {
   afterEach(() => {
     cwdSpy.mockRestore();
     delete process.env.CLAUDE_CONFIG_DIR;
+    delete process.env.CLAUDE_MCP_CONFIG_PATH;
     delete process.env.OMC_HOME;
     delete process.env.CODEX_HOME;
     for (const dir of [TEST_CLAUDE_DIR, TEST_PROJECT_DIR]) {

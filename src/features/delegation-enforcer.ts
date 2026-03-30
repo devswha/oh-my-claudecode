@@ -59,6 +59,11 @@ export interface EnforcementResult {
   warning?: string;
 }
 
+function isDelegationToolName(toolName: string): boolean {
+  const normalizedToolName = toolName.toLowerCase();
+  return normalizedToolName === 'agent' || normalizedToolName === 'task';
+}
+
 function canonicalizeSubagentType(subagentType: string): string {
   const hasPrefix = subagentType.startsWith('oh-my-claudecode:');
   const rawAgentType = subagentType.replace(/^oh-my-claudecode:/, '');
@@ -177,7 +182,7 @@ export function enforceModel(agentInput: AgentInput): EnforcementResult {
  * Check if tool input is an agent delegation call
  */
 export function isAgentCall(toolName: string, toolInput: unknown): toolInput is AgentInput {
-  if (toolName !== 'Agent' && toolName !== 'Task') {
+  if (!isDelegationToolName(toolName)) {
     return false;
   }
 

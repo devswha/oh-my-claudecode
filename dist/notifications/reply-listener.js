@@ -26,6 +26,7 @@ import { capturePaneContent, sendToPane, isTmuxAvailable, } from '../features/ra
 import { lookupByMessageId, loadAllMappings, removeMessagesByPane, pruneStale, } from './session-registry.js';
 import { parseMentionAllowedMentions } from './config.js';
 import { redactTokens } from './redact.js';
+import { isProcessAlive } from '../platform/index.js';
 import { validateSlackMessage, } from './slack-socket.js';
 // ESM compatibility: __filename is not available in ES modules
 const __filename = fileURLToPath(import.meta.url);
@@ -206,18 +207,6 @@ function removePidFile() {
     }
 }
 /**
- * Check if a process is running
- */
-function isProcessRunning(pid) {
-    try {
-        process.kill(pid, 0);
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
-/**
  * Check if daemon is currently running
  */
 export function isDaemonRunning() {
@@ -225,7 +214,7 @@ export function isDaemonRunning() {
     if (pid === null) {
         return false;
     }
-    if (!isProcessRunning(pid)) {
+    if (!isProcessAlive(pid)) {
         removePidFile();
         return false;
     }
@@ -824,7 +813,7 @@ export function stopReplyListener() {
             message: 'Reply listener daemon is not running',
         };
     }
-    if (!isProcessRunning(pid)) {
+    if (!isProcessAlive(pid)) {
         removePidFile();
         return {
             success: true,

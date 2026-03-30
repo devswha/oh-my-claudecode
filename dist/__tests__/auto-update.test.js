@@ -17,6 +17,7 @@ vi.mock('fs', async () => {
     const actual = await vi.importActual('fs');
     return {
         ...actual,
+        cpSync: vi.fn(),
         existsSync: vi.fn(),
         mkdirSync: vi.fn(),
         readFileSync: vi.fn(),
@@ -24,7 +25,7 @@ vi.mock('fs', async () => {
     };
 });
 import { execSync, execFileSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { install, isProjectScopedPlugin, checkNodeVersion } from '../installer/index.js';
@@ -32,6 +33,7 @@ import * as hooksModule from '../installer/hooks.js';
 import { reconcileUpdateRuntime, performUpdate, } from '../features/auto-update.js';
 const mockedExecSync = vi.mocked(execSync);
 const mockedExecFileSync = vi.mocked(execFileSync);
+const mockedCpSync = vi.mocked(cpSync);
 const mockedExistsSync = vi.mocked(existsSync);
 const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedReadFileSync = vi.mocked(readFileSync);
@@ -130,6 +132,108 @@ describe('auto-update reconciliation', () => {
             refreshHooksInPlugin: true,
         });
     });
+    it('syncs active plugin cache roots and logs when copy occurs', () => {
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+        const activeRoot = '/tmp/.claude/plugins/cache/omc/oh-my-claudecode/4.1.5';
+        mockedReadFileSync.mockImplementation((path) => {
+            const normalized = String(path).replace(/\\/g, '/');
+            if (normalized.includes('.omc-version.json')) {
+                return JSON.stringify({
+                    version: '4.1.5',
+                    installedAt: '2026-02-09T00:00:00.000Z',
+                    installMethod: 'npm',
+                });
+            }
+            if (normalized.endsWith('/plugins/installed_plugins.json')) {
+                return JSON.stringify({
+                    plugins: {
+                        'oh-my-claudecode': [{ installPath: activeRoot }],
+                    },
+                });
+            }
+            return '';
+        });
+        mockedExistsSync.mockImplementation((path) => {
+            const normalized = String(path).replace(/\\/g, '/');
+            if (normalized.endsWith('/plugins/installed_plugins.json')) {
+                return true;
+            }
+            if (normalized === activeRoot) {
+                return true;
+            }
+            if (normalized.includes('/node_modules/')) {
+                return false;
+            }
+            return true;
+        });
+        const result = reconcileUpdateRuntime({ verbose: false });
+        expect(result.success).toBe(true);
+        expect(mockedCpSync).toHaveBeenCalledWith(expect.stringContaining('/dist'), `${activeRoot}/dist`, expect.objectContaining({ recursive: true, force: true }));
+        expect(mockedCpSync).toHaveBeenCalledWith(expect.stringContaining('/package.json'), `${activeRoot}/package.json`, expect.objectContaining({ recursive: true, force: true }));
+        expect(mockedCpSync).not.toHaveBeenCalledWith(expect.stringContaining('/node_modules'), expect.anything(), expect.anything());
+        expect(consoleLogSpy).toHaveBeenCalledWith('[omc update] Synced plugin cache');
+    });
+    it('skips plugin cache sync silently when no active plugin roots exist', () => {
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+        mockedExistsSync.mockImplementation((path) => {
+            const normalized = String(path).replace(/\\/g, '/');
+            if (normalized.endsWith('/plugins/installed_plugins.json')) {
+                return false;
+            }
+            return true;
+        });
+        const result = reconcileUpdateRuntime({ verbose: false });
+        expect(result.success).toBe(true);
+        expect(mockedCpSync).not.toHaveBeenCalled();
+        expect(consoleLogSpy).not.toHaveBeenCalledWith('[omc update] Synced plugin cache');
+    });
+    it('dedupes plugin roots and ignores missing targets during sync', () => {
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => { });
+        const activeRoot = '/tmp/.claude/plugins/cache/omc/oh-my-claudecode/4.1.5';
+        const staleRoot = '/tmp/.claude/plugins/cache/omc/oh-my-claudecode/4.1.4';
+        process.env.CLAUDE_PLUGIN_ROOT = activeRoot;
+        mockedReadFileSync.mockImplementation((path) => {
+            const normalized = String(path).replace(/\\/g, '/');
+            if (normalized.includes('.omc-version.json')) {
+                return JSON.stringify({
+                    version: '4.1.5',
+                    installedAt: '2026-02-09T00:00:00.000Z',
+                    installMethod: 'npm',
+                });
+            }
+            if (normalized.endsWith('/plugins/installed_plugins.json')) {
+                return JSON.stringify({
+                    plugins: {
+                        'oh-my-claudecode': [
+                            { installPath: activeRoot },
+                            { installPath: staleRoot },
+                        ],
+                    },
+                });
+            }
+            return '';
+        });
+        mockedExistsSync.mockImplementation((path) => {
+            const normalized = String(path).replace(/\\/g, '/');
+            if (normalized.endsWith('/plugins/installed_plugins.json')) {
+                return true;
+            }
+            if (normalized === activeRoot) {
+                return true;
+            }
+            if (normalized === staleRoot) {
+                return false;
+            }
+            return true;
+        });
+        const result = reconcileUpdateRuntime({ verbose: false });
+        expect(result.success).toBe(true);
+        const targetCalls = mockedCpSync.mock.calls.filter(([, destination]) => String(destination).startsWith(activeRoot));
+        expect(targetCalls.length).toBeGreaterThan(0);
+        expect(mockedCpSync.mock.calls.some(([, destination]) => String(destination).startsWith(staleRoot))).toBe(false);
+        expect(consoleLogSpy).toHaveBeenCalledTimes(1);
+        expect(consoleLogSpy).toHaveBeenCalledWith('[omc update] Synced plugin cache');
+    });
     it('runs reconciliation as part of performUpdate', async () => {
         // Set env var so performUpdate takes the direct reconciliation path
         // (simulates being in the re-exec'd process after npm install)
@@ -190,6 +294,121 @@ describe('auto-update reconciliation', () => {
         expect(result.errors).toEqual(['Reconciliation failed: boom']);
         expect(mockedWriteFileSync).not.toHaveBeenCalled();
     });
+    it('skips marketplace auto-sync when the marketplace clone has local modifications', async () => {
+        process.env.OMC_UPDATE_RECONCILE = '1';
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                tag_name: 'v4.1.5',
+                name: '4.1.5',
+                published_at: '2026-02-09T00:00:00.000Z',
+                html_url: 'https://example.com/release',
+                body: 'notes',
+                prerelease: false,
+                draft: false,
+            }),
+        }));
+        mockedExecSync.mockReturnValue('');
+        mockedExecFileSync.mockImplementation((command, args) => {
+            if (command !== 'git') {
+                return '';
+            }
+            if (args?.includes('fetch') || args?.includes('checkout')) {
+                return '';
+            }
+            if (args?.includes('rev-parse')) {
+                return 'main\n';
+            }
+            if (args?.includes('status')) {
+                return ' M package.json\n?? scratch.txt\n';
+            }
+            throw new Error(`Unexpected git command: ${String(args?.join(' '))}`);
+        });
+        const result = await performUpdate({ verbose: false });
+        expect(result.success).toBe(true);
+        expect(mockedExecFileSync).toHaveBeenCalledWith('git', ['-C', expect.stringContaining('/plugins/marketplaces/omc'), 'status', '--porcelain', '--untracked-files=normal'], expect.any(Object));
+        expect(mockedExecFileSync).not.toHaveBeenCalledWith('git', expect.arrayContaining(['rev-list', '--left-right', '--count', 'HEAD...origin/main']), expect.any(Object));
+        expect(mockedExecFileSync).not.toHaveBeenCalledWith('git', expect.arrayContaining(['merge', '--ff-only', 'origin/main']), expect.any(Object));
+        delete process.env.OMC_UPDATE_RECONCILE;
+    });
+    it('skips marketplace auto-sync when the marketplace clone has local commits', async () => {
+        process.env.OMC_UPDATE_RECONCILE = '1';
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                tag_name: 'v4.1.5',
+                name: '4.1.5',
+                published_at: '2026-02-09T00:00:00.000Z',
+                html_url: 'https://example.com/release',
+                body: 'notes',
+                prerelease: false,
+                draft: false,
+            }),
+        }));
+        mockedExecSync.mockReturnValue('');
+        mockedExecFileSync.mockImplementation((command, args) => {
+            if (command !== 'git') {
+                return '';
+            }
+            if (args?.includes('fetch') || args?.includes('checkout')) {
+                return '';
+            }
+            if (args?.includes('rev-parse')) {
+                return 'main\n';
+            }
+            if (args?.includes('status')) {
+                return '';
+            }
+            if (args?.includes('rev-list')) {
+                return '1 0\n';
+            }
+            throw new Error(`Unexpected git command: ${String(args?.join(' '))}`);
+        });
+        const result = await performUpdate({ verbose: false });
+        expect(result.success).toBe(true);
+        expect(mockedExecFileSync).toHaveBeenCalledWith('git', ['-C', expect.stringContaining('/plugins/marketplaces/omc'), 'rev-list', '--left-right', '--count', 'HEAD...origin/main'], expect.any(Object));
+        expect(mockedExecFileSync).not.toHaveBeenCalledWith('git', expect.arrayContaining(['merge', '--ff-only', 'origin/main']), expect.any(Object));
+        delete process.env.OMC_UPDATE_RECONCILE;
+    });
+    it('fast-forwards a clean marketplace clone when origin/main is ahead', async () => {
+        process.env.OMC_UPDATE_RECONCILE = '1';
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                tag_name: 'v4.1.5',
+                name: '4.1.5',
+                published_at: '2026-02-09T00:00:00.000Z',
+                html_url: 'https://example.com/release',
+                body: 'notes',
+                prerelease: false,
+                draft: false,
+            }),
+        }));
+        mockedExecSync.mockReturnValue('');
+        mockedExecFileSync.mockImplementation((command, args) => {
+            if (command !== 'git') {
+                return '';
+            }
+            if (args?.includes('fetch') || args?.includes('checkout') || args?.includes('merge')) {
+                return '';
+            }
+            if (args?.includes('rev-parse')) {
+                return 'main\n';
+            }
+            if (args?.includes('status')) {
+                return '';
+            }
+            if (args?.includes('rev-list')) {
+                return '0 3\n';
+            }
+            throw new Error(`Unexpected git command: ${String(args?.join(' '))}`);
+        });
+        const result = await performUpdate({ verbose: false });
+        expect(result.success).toBe(true);
+        expect(mockedExecFileSync).toHaveBeenCalledWith('git', ['-C', expect.stringContaining('/plugins/marketplaces/omc'), 'merge', '--ff-only', 'origin/main'], expect.any(Object));
+        expect(mockedExecFileSync).not.toHaveBeenCalledWith('git', expect.arrayContaining(['reset', '--hard', 'origin/main']), expect.any(Object));
+        delete process.env.OMC_UPDATE_RECONCILE;
+    });
     it('re-execs with omc.cmd on Windows and persists metadata after reconciliation', async () => {
         mockPlatform('win32');
         mockedExistsSync.mockImplementation((path) => {
@@ -241,7 +460,9 @@ describe('auto-update reconciliation', () => {
             encoding: 'utf-8',
             stdio: 'pipe',
             timeout: 60000,
+            shell: true,
             windowsHide: true,
+            shell: true,
             env: expect.objectContaining({ OMC_UPDATE_RECONCILE: '1' }),
         }));
         expect(mockedWriteFileSync).toHaveBeenCalledWith(expect.stringContaining('.omc-version.json'), expect.stringContaining('"version": "4.1.6"'));
@@ -284,6 +505,11 @@ describe('auto-update reconciliation', () => {
         expect(result.success).toBe(false);
         expect(result.message).toBe('Updated to 4.1.6, but runtime reconciliation failed');
         expect(result.errors).toEqual(['spawnSync C:\\Users\\bellman\\AppData\\Roaming\\npm\\omc.cmd ENOENT']);
+        expect(mockedExecFileSync).toHaveBeenNthCalledWith(2, 'C:\\Users\\bellman\\AppData\\Roaming\\npm\\omc.cmd', ['update-reconcile'], expect.objectContaining({
+            shell: true,
+            windowsHide: true,
+            env: expect.objectContaining({ OMC_UPDATE_RECONCILE: '1' }),
+        }));
         expect(mockedWriteFileSync).not.toHaveBeenCalled();
     });
     it('preserves non-OMC hooks when refreshing plugin hooks during reconciliation', () => {

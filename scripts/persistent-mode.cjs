@@ -197,6 +197,10 @@ function getSafeReinforcementCount(value) {
     : 0;
 }
 
+function isAwaitingConfirmation(state) {
+  return state?.awaiting_confirmation === true;
+}
+
 // ---------------------------------------------------------------------------
 // Stop Breaker helpers (shared by team pipeline and ralplan)
 // ---------------------------------------------------------------------------
@@ -366,6 +370,18 @@ function readStateFileWithSession(stateDir, filename, sessionId) {
   }
   // No sessionId: fall back to legacy path (backward compat)
   return readStateFile(stateDir, filename);
+}
+
+function getActiveSubagentCount(stateDir) {
+  try {
+    const tracking = readJsonFile(join(stateDir, "subagent-tracking.json"));
+    if (!tracking || !Array.isArray(tracking.agents)) {
+      return 0;
+    }
+    return tracking.agents.filter((agent) => agent?.status === "running").length;
+  } catch {
+    return 0;
+  }
 }
 
 /**
@@ -629,7 +645,7 @@ async function main() {
 
     // Priority 1: Ralph Loop (explicit persistence mode)
     // Skip if state is stale (older than 2 hours) - prevents blocking new sessions
-    if (ralph.state?.active && !isStaleState(ralph.state) && isSessionMatch(ralph.state, sessionId)) {
+    if (ralph.state?.active && !isAwaitingConfirmation(ralph.state) && !isStaleState(ralph.state) && isSessionMatch(ralph.state, sessionId)) {
       const iteration = ralph.state.iteration || 1;
       const maxIter = ralph.state.max_iterations || 100;
 
@@ -662,7 +678,7 @@ async function main() {
     }
 
     // Priority 2: Autopilot (high-level orchestration)
-    if (autopilot.state?.active && !isStaleState(autopilot.state) && isSessionMatch(autopilot.state, sessionId)) {
+    if (autopilot.state?.active && !isAwaitingConfirmation(autopilot.state) && !isStaleState(autopilot.state) && isSessionMatch(autopilot.state, sessionId)) {
       const phase = autopilot.state.phase || "unknown";
       if (phase !== "complete") {
         const newCount = (autopilot.state.reinforcement_count || 0) + 1;
@@ -753,7 +769,7 @@ async function main() {
     }
 
     // Priority 2.6: Ralplan (standalone consensus planning — first-class enforcement)
-    if (ralplan.state?.active && !isStaleState(ralplan.state) && isSessionMatch(ralplan.state, sessionId)) {
+    if (ralplan.state?.active && !isAwaitingConfirmation(ralplan.state) && !isStaleState(ralplan.state) && isSessionMatch(ralplan.state, sessionId)) {
       // Terminal phase detection
       const currentPhase = ralplan.state.current_phase;
       let ralplanTerminal = false;
@@ -938,7 +954,7 @@ async function main() {
     // Session isolation: only block if state belongs to this session (issue #311)
     // Project isolation: only block if state belongs to this project
     if (
-      ultrawork.state?.active &&
+      ultrawork.state?.active && !isAwaitingConfirmation(ultrawork.state) &&
       !isStaleState(ultrawork.state) &&
       isSessionMatch(ultrawork.state, sessionId) &&
       isStateForCurrentProject(ultrawork.state, directory, ultrawork.isGlobal)
@@ -1009,6 +1025,11 @@ async function main() {
           const maxReinforcements = skillState.state.max_reinforcements || 3;
 
           if (count < maxReinforcements) {
+            if (getActiveSubagentCount(stateDir) > 0) {
+              console.log(JSON.stringify({ continue: true, suppressOutput: true }));
+              return;
+            }
+
             skillState.state.reinforcement_count = count + 1;
             skillState.state.last_checked_at = new Date().toISOString();
             writeJsonFile(skillState.path, skillState.state);

@@ -22,8 +22,8 @@ import {
   clearScopedTeamState,
   convergeJobWithResultArtifact,
   isJobTerminal,
-  isPidAlive,
 } from './team-job-convergence.js';
+import { isProcessAlive } from '../platform/index.js';
 import type { OmcTeamJob } from './team-job-convergence.js';
 
 const omcTeamJobs = new Map<string, OmcTeamJob>();
@@ -311,7 +311,7 @@ export async function handleStatus(args: unknown): Promise<{ content: Array<{ ty
     return makeJobResponse(job_id, job);
   }
 
-  if (job.pid != null && !isPidAlive(job.pid)) {
+  if (job.pid != null && !isProcessAlive(job.pid)) {
     job = saveJobState(job_id, {
       ...job,
       status: 'failed',
@@ -364,7 +364,7 @@ export async function handleWait(args: unknown): Promise<{ content: Array<{ type
       return out;
     }
 
-    if (job.pid != null && !isPidAlive(job.pid)) {
+    if (job.pid != null && !isProcessAlive(job.pid)) {
       job = saveJobState(job_id, {
         ...job,
         status: 'failed',

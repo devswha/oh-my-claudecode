@@ -14,8 +14,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { writeFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
 import {
   loadConfig,
   getConfigPaths,
@@ -45,6 +43,7 @@ import {
 import { doctorConflictsCommand } from './commands/doctor-conflicts.js';
 import { sessionSearchCommand } from './commands/session-search.js';
 import { teamCommand } from './commands/team.js';
+import { ralphthonCommand } from './commands/ralphthon.js';
 import {
   teleportCommand,
   teleportListCommand,
@@ -56,8 +55,8 @@ import { launchCommand } from './launch.js';
 import { interopCommand } from './interop.js';
 import { askCommand, ASK_USAGE } from './ask.js';
 import { warnIfWin32 } from './win32-warning.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { autoresearchCommand } from './autoresearch.js';
+import { runHudWatchLoop } from './hud-watch.js';
 
 const version = getRuntimePackageVersion();
 
@@ -1280,12 +1279,7 @@ program
     const { main: hudMain } = await import('../hud/index.js');
     if (options.watch) {
       const intervalMs = parseInt(options.interval, 10);
-      let skipInit = false;
-      while (true) {
-        await hudMain(true, skipInit);
-        skipInit = true;
-        await new Promise<void>(resolve => setTimeout(resolve, intervalMs));
-      }
+      await runHudWatchLoop({ intervalMs, hudMain });
     } else {
       await hudMain();
     }
@@ -1330,6 +1324,37 @@ program
   .argument('[args...]', 'team subcommand arguments')
   .action(async (args: string[]) => {
     await teamCommand(args);
+  });
+
+/**
+ * Autoresearch command - thin-supervisor autoresearch with keep/discard/reset parity
+ */
+program
+  .command('autoresearch')
+  .description('Launch thin-supervisor autoresearch with keep/discard/reset parity')
+  .helpOption(false)
+  .allowUnknownOption(true)
+  .allowExcessArguments(true)
+  .argument('[args...]', 'autoresearch subcommand arguments')
+  .action(async (args: string[]) => {
+    await autoresearchCommand(args);
+  });
+
+/**
+ * Ralphthon command - Autonomous hackathon lifecycle
+ *
+ * Deep-interview generates PRD, ralph loop executes tasks,
+ * auto-hardening phase, terminates after clean waves.
+ */
+program
+  .command('ralphthon')
+  .description('Autonomous hackathon lifecycle: interview -> execute -> harden -> done')
+  .helpOption(false)
+  .allowUnknownOption(true)
+  .allowExcessArguments(true)
+  .argument('[args...]', 'ralphthon arguments')
+  .action(async (args: string[]) => {
+    await ralphthonCommand(args);
   });
 
 // Parse arguments

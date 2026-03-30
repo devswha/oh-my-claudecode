@@ -19,29 +19,10 @@ import { join } from 'path';
 import { getClaudeConfigDir } from '../utils/paths.js';
 import { sanitizeName } from './tmux-session.js';
 import { atomicWriteJson, validateResolvedPath, ensureDirWithMode } from './fs-utils.js';
+import { isProcessAlive } from '../platform/index.js';
 import { getTaskStoragePath, getLegacyTaskStoragePath } from './state-paths.js';
 /** Default age (ms) after which a lock file is considered stale. */
 const DEFAULT_STALE_LOCK_MS = 30_000;
-const FAILURE_LOCK_RETRY_ATTEMPTS = 40;
-const FAILURE_LOCK_RETRY_DELAY_MS = 5;
-/**
- * Check if a process with the given PID is alive.
- * Returns false for PIDs <= 0 or if kill(pid, 0) throws ESRCH.
- */
-function isPidAlive(pid) {
-    if (pid <= 0 || !Number.isFinite(pid))
-        return false;
-    try {
-        process.kill(pid, 0);
-        return true;
-    }
-    catch (e) {
-        // EPERM means the process exists but we don't have permission — still alive
-        if (e && typeof e === 'object' && 'code' in e && e.code === 'EPERM')
-            return true;
-        return false;
-    }
-}
 /**
  * Try to acquire an exclusive lock file for a task.
  *
@@ -101,21 +82,6 @@ export function releaseTaskLock(handle) {
     }
     catch { /* already removed */ }
 }
-async function sleepAsync(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-async function acquireTaskLockWithRetry(teamName, taskId, opts) {
-    const attempts = opts?.attempts ?? FAILURE_LOCK_RETRY_ATTEMPTS;
-    const delayMs = opts?.delayMs ?? FAILURE_LOCK_RETRY_DELAY_MS;
-    for (let attempt = 0; attempt < attempts; attempt++) {
-        const handle = acquireTaskLock(teamName, taskId, opts);
-        if (handle)
-            return handle;
-        if (attempt < attempts - 1)
-            await sleepAsync(delayMs);
-    }
-    throw new Error(`Failed to acquire lock for ${taskId} after ${attempts} attempts`);
-}
 /**
  * Execute a function while holding an exclusive task lock.
  * Returns the function's result, or null if the lock could not be acquired.
@@ -145,7 +111,7 @@ function isLockStale(lockPath, staleLockMs) {
         try {
             const raw = readFileSync(lockPath, 'utf-8');
             const payload = JSON.parse(raw);
-            if (payload.pid && isPidAlive(payload.pid))
+            if (payload.pid && isProcessAlive(payload.pid))
                 return false;
         }
         catch {

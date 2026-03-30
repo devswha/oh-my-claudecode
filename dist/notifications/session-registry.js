@@ -12,6 +12,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, openSync, closeSync
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
+import { isProcessAlive } from '../platform/index.js';
 // ============================================================================
 // Constants
 // ============================================================================
@@ -59,23 +60,6 @@ function ensureRegistryDir() {
  */
 function sleepMs(ms) {
     Atomics.wait(SLEEP_ARRAY, 0, 0, ms);
-}
-/**
- * Check whether a process is alive.
- * EPERM indicates a live process we can't signal.
- */
-function isPidAlive(pid) {
-    if (!Number.isFinite(pid) || pid <= 0) {
-        return false;
-    }
-    try {
-        process.kill(pid, 0);
-        return true;
-    }
-    catch (error) {
-        const err = error;
-        return err.code === 'EPERM';
-    }
 }
 /**
  * Read/parse lock snapshot.
@@ -167,7 +151,7 @@ function acquireRegistryLock() {
                         continue;
                     }
                     // Never reap an active lock held by a live process.
-                    if (snapshot.pid !== null && isPidAlive(snapshot.pid)) {
+                    if (snapshot.pid !== null && isProcessAlive(snapshot.pid)) {
                         sleepMs(LOCK_RETRY_MS);
                         continue;
                     }
