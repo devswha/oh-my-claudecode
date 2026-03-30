@@ -40,25 +40,14 @@ Hook output is injected into Claude via `<system-reminder>` tags. Additional con
 
 OMC hooks fall into four categories:
 
-### Execution Mode Hooks
-
-Manage execution modes including autonomous operation, parallel processing, and persistence.
-
-| Hook | Description |
-|------|-------------|
-| autopilot | Fully autonomous execution from idea to working code |
-| ralph | Persistent execution until verification completes |
-| ultrawork | Maximum parallel agent execution |
-| ultraqa | Repeating QA cycles until goal is achieved |
-| persistent-mode | Preserves mode state across sessions |
-
 ### Core Hooks
 
-Handle orchestration, keyword detection, and recovery.
+Handle orchestration, keyword detection, and mode persistence.
 
 | Hook | Description |
 |------|-------------|
-| keyword-detector | Detects magic keywords (ultrawork, ralph, etc.) |
+| keyword-detector | Detects magic keywords and activates corresponding skills |
+| persistent-mode | Enforces continuation when an execution mode (ralph, autopilot, ultrawork, etc.) is active — injects reinforcement messages on Stop to prevent premature halting |
 
 ### Context Management Hooks
 
@@ -221,45 +210,7 @@ Saves agent activity, token usage, and other session data to `.omc/sessions/`. I
 
 ## Core Hooks
 
-### Execution Mode Hooks
-
-These hooks manage OMC's core execution modes using state files at `.omc/state/{mode}-state.json`.
-
-#### autopilot
-
-Fully autonomous execution from idea to working code.
-
-- **Activation**: Keywords: "autopilot", "build me", "I want a"
-- **Behavior**: Automatically runs the full cycle: plan → implement → test → verify
-- **State file**: `.omc/state/autopilot-state.json`
-
-#### ralph
-
-Persistent execution mode that keeps running until verification completes.
-
-- **Activation**: Keywords: "ralph", "don't stop", "must complete"
-- **Behavior**: Does not stop until all work is complete and verified
-- **Features**: Automatically includes ultrawork. Can be linked with team (`team ralph`)
-- **State file**: `.omc/state/ralph-state.json`
-- **Reinforcement message**: "The boulder never stops" — injected by the Stop hook to encourage continued work
-
-#### ultrawork
-
-Runs multiple agents simultaneously with maximum parallelism.
-
-- **Activation**: Keywords: "ultrawork", "ulw"
-- **Behavior**: Delegates independent tasks to multiple agents in parallel
-- **State file**: `.omc/state/ultrawork-state.json`
-
-#### ultraqa
-
-Repeats QA cycles until the goal is achieved.
-
-- **Activation**: Runs automatically within autopilot
-- **Behavior**: test → verify → fix → repeat
-- **Related skill**: `/oh-my-claudecode:ultraqa`
-
-### Orchestration Hooks
+### Core Hook Details
 
 #### keyword-detector
 
@@ -274,12 +225,16 @@ See the [Magic Keywords](#magic-keywords) section for the full keyword list.
 
 #### persistent-mode
 
-Maintains active execution mode state across sessions.
+Enforces continuation when an execution mode is active. This is the hook that keeps skills like autopilot, ralph, and ultrawork running.
 
 - **Event**: Stop
-- **Behavior**: Injects a reinforcement message when an active mode (ralph, ultrawork, autopilot, etc.) is present
-- **Message**: Encourages continued work when incomplete tasks remain
+- **Behavior**: Checks `.omc/state/` for active mode state files. If any mode (ralph, autopilot, ultrawork, ultraqa, team, pipeline) is active, injects a reinforcement message to prevent Claude from stopping.
+- **Reinforcement message**: "The boulder never stops" — prompts Claude to continue working
+- **Staleness check**: States older than 2 hours are treated as inactive to prevent stale state from blocking new sessions
+- **Notification**: Sends Discord/Telegram/Slack notification on first stop (if configured)
 - **Cancel**: Use `/oh-my-claudecode:cancel` to deactivate modes
+
+> **Note**: autopilot, ralph, ultrawork, and ultraqa are **skills** (invoked via keyword-detector), not hooks. The persistent-mode hook is what enforces their continuation by blocking the Stop event.
 
 ### Mode State Management
 
